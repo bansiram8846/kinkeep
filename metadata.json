@@ -1,0 +1,6 @@
+{
+  "name": "KinKeep",
+  "description": "Secure encrypted family document vault and record manager with expiration tracking and shared member access",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
