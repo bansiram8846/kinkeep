@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [FamilyMemberEntity::class, VaultDocumentEntity::class],
-    version = 4,
+    version = 8,
     exportSchema = false
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -29,7 +29,7 @@ abstract class VaultDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     VaultDatabase::class.java,
-                    "kinkeep_vault.db"
+                    "kinkeep_clean_vault_v8.db"
                 )
                     .fallbackToDestructiveMigration()
                     .addCallback(VaultDatabaseCallback(scope))

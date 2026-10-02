@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Diversity3
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.LockOpen
@@ -68,6 +70,8 @@ import com.example.ui.components.AddFamilyMemberDialog
 import com.example.ui.components.CyberButton3D
 import com.example.ui.components.CyberIconButton3D
 import com.example.ui.components.CyberSecondaryButton3D
+import com.example.ui.components.DocumentSelectorDialog
+import com.example.ui.components.FamilyMemberDetailDialog
 import com.example.ui.components.StatusPill
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.AlertRedLight
@@ -100,6 +104,9 @@ fun VaultOverviewScreen(
     val expiringDocs by viewModel.expiringDocuments.collectAsState()
 
     var isAddMemberDialogOpen by remember { mutableStateOf(false) }
+    var selectedDetailMember by remember { mutableStateOf<FamilyMemberEntity?>(null) }
+    var isDocumentSelectorOpen by remember { mutableStateOf(false) }
+    var selectedCategoryForSelector by remember { mutableStateOf("All") }
 
     val pinnedDocs = allDocs.filter { it.isPinned }.take(4).ifEmpty { allDocs.take(3) }
     val urgentDoc = expiringDocs.firstOrNull()
@@ -122,24 +129,56 @@ fun VaultOverviewScreen(
                 DashboardHeader(
                     expiringCount = expiringDocs.size,
                     onNotificationsClick = { viewModel.openAlertsModal() },
-                    onProfileClick = { onOpenMemberVault("alex") }
+                    onProfileClick = {
+                        selectedDetailMember = allMembers.firstOrNull()
+                    }
                 )
             }
 
             // Greeting
             item {
                 Column {
+                    val firstName = allMembers.firstOrNull()?.name?.split(" ")?.firstOrNull()
                     Text(
-                        text = "Good morning, Alex 👋",
+                        text = if (firstName != null && firstName != "Family") "Good morning, $firstName 👋" else "Good morning 👋",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = "Your family archive is secure and updated",
+                        text = "Your encrypted family vault is active and secure",
                         fontSize = 13.sp,
                         color = TextSecondary
+                    )
+                }
+            }
+
+            // 8D FLOATING ACTION BUTTONS
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CyberButton3D(
+                        text = "Family Members",
+                        icon = Icons.Default.Diversity3,
+                        onClick = {
+                            selectedDetailMember = allMembers.firstOrNull()
+                        },
+                        modifier = Modifier.weight(1f),
+                        testTag = "dashboard_floating_family_members_button"
+                    )
+
+                    CyberSecondaryButton3D(
+                        text = "Documents",
+                        icon = Icons.Default.FolderOpen,
+                        onClick = {
+                            selectedCategoryForSelector = "All"
+                            isDocumentSelectorOpen = true
+                        },
+                        modifier = Modifier.weight(1f),
+                        testTag = "dashboard_floating_documents_button"
                     )
                 }
             }
@@ -153,18 +192,25 @@ fun VaultOverviewScreen(
                     StatCard(
                         title = "Total Docs",
                         count = allDocs.size.toString(),
-                        subtitle = if (allDocs.isEmpty()) "Empty" else "✓ Safe",
+                        subtitle = if (allDocs.isEmpty()) "Tap to View" else "✓ Select & View",
                         subtitleColor = CyberTeal,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                selectedCategoryForSelector = "All"
+                                isDocumentSelectorOpen = true
+                            }
                     )
                     StatCard(
                         title = "Family",
                         count = allMembers.size.toString(),
-                        subtitle = "Members",
-                        subtitleColor = TextSecondary,
+                        subtitle = "Member Details",
+                        subtitleColor = CyberTeal,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onManageFamily() }
+                            .clickable {
+                                selectedDetailMember = allMembers.firstOrNull()
+                            }
                     )
                     StatCard(
                         title = "Expiring",
@@ -189,29 +235,17 @@ fun VaultOverviewScreen(
                 }
             }
 
-            // Clean Zero State if vault is empty
-            if (allDocs.isEmpty()) {
-                item {
-                    EmptyVaultZeroState(
-                        onUploadClick = onOpenUpload,
-                        onAddMemberClick = { isAddMemberDialogOpen = true }
-                    )
-                }
-            }
-
             // Family Members Carousel
             item {
                 FamilyMembersSection(
                     members = allMembers,
                     totalDocsCount = allDocs.size,
                     onMemberClick = { memberId ->
-                        if (memberId == "all") {
-                            onOpenMemberVault("alex")
-                        } else {
-                            onOpenMemberVault(memberId)
-                        }
+                        selectedDetailMember = allMembers.find { it.id == memberId } ?: allMembers.firstOrNull()
                     },
-                    onManageClick = onManageFamily,
+                    onManageClick = {
+                        selectedDetailMember = allMembers.firstOrNull()
+                    },
                     onAddMemberClick = { isAddMemberDialogOpen = true }
                 )
             }
@@ -221,8 +255,8 @@ fun VaultOverviewScreen(
                 DocumentCategoriesSection(
                     allDocs = allDocs,
                     onCategoryClick = { catName ->
-                        viewModel.setDashboardCategoryFilter(catName)
-                        onOpenUpload()
+                        selectedCategoryForSelector = catName
+                        isDocumentSelectorOpen = true
                     }
                 )
             }
@@ -234,7 +268,10 @@ fun VaultOverviewScreen(
                         documents = pinnedDocs,
                         onViewDoc = { viewModel.viewDocument(it) },
                         onShareDoc = { viewModel.openShare(it) },
-                        onViewAll = { onOpenMemberVault("alex") }
+                        onViewAll = {
+                            selectedCategoryForSelector = "All"
+                            isDocumentSelectorOpen = true
+                        }
                     )
                 }
             }
@@ -242,22 +279,6 @@ fun VaultOverviewScreen(
             item {
                 Spacer(modifier = Modifier.height(88.dp))
             }
-        }
-
-        // 8D Tactile Floating Action Button
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 68.dp)
-        ) {
-            CyberButton3D(
-                text = "Add Document",
-                icon = Icons.Default.QrCodeScanner,
-                onClick = onOpenUpload,
-                height = 48.dp,
-                modifier = Modifier.width(180.dp),
-                testTag = "fab_add_document"
-            )
         }
 
         // Add Family Member Modal Dialog
@@ -269,72 +290,39 @@ fun VaultOverviewScreen(
                 }
             )
         }
-    }
-}
 
-@Composable
-private fun EmptyVaultZeroState(
-    onUploadClick: () -> Unit,
-    onAddMemberClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceContainer)
-            .border(1.5.dp, CyberTeal.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-            .padding(20.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(CyberTeal.copy(alpha = 0.15f))
-                    .border(2.dp, CyberTeal.copy(alpha = 0.5f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Security,
-                    contentDescription = null,
-                    tint = CyberTeal,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Text(
-                text = "Your Family Vault is Ready",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
+        // Family Member Detail Modal
+        if (selectedDetailMember != null) {
+            FamilyMemberDetailDialog(
+                initialMember = selectedDetailMember!!,
+                allMembers = allMembers,
+                allDocuments = allDocs,
+                onViewDocument = { doc ->
+                    viewModel.viewDocument(doc)
+                },
+                onOpenMemberVault = { memberId ->
+                    onOpenMemberVault(memberId)
+                },
+                onDismiss = {
+                    selectedDetailMember = null
+                }
             )
+        }
 
-            Text(
-                text = "Zero test clutter. Secure your driving licenses, vehicle policies, passports, property deeds & health insurance records in one private encrypted repository.",
-                fontSize = 12.sp,
-                color = TextSecondary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 8D Buttons in zero state
-            CyberButton3D(
-                text = "+ Upload First Document",
-                icon = Icons.Default.UploadFile,
-                onClick = onUploadClick,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            CyberSecondaryButton3D(
-                text = "+ Add Family Member",
-                icon = Icons.Default.PersonAdd,
-                onClick = onAddMemberClick,
-                modifier = Modifier.fillMaxWidth()
+        // Document Selector & Viewer Dialog
+        if (isDocumentSelectorOpen) {
+            DocumentSelectorDialog(
+                allDocuments = allDocs,
+                initialCategory = selectedCategoryForSelector,
+                onSelectDocument = { doc ->
+                    viewModel.viewDocument(doc)
+                },
+                onAddNewDocument = {
+                    onOpenUpload()
+                },
+                onDismiss = {
+                    isDocumentSelectorOpen = false
+                }
             )
         }
     }
@@ -681,7 +669,7 @@ private fun FamilyMembersSection(
                             .size(24.dp)
                             .clip(CircleShape)
                             .background(
-                                if (member.id == "alex") CyberTeal.copy(alpha = 0.25f)
+                                if (member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)) CyberTeal.copy(alpha = 0.25f)
                                 else QuantumIndigo.copy(alpha = 0.25f)
                             ),
                         contentAlignment = Alignment.Center
@@ -698,13 +686,14 @@ private fun FamilyMembersSection(
                                 text = member.initials,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (member.id == "alex") CyberTeal else IndigoLight
+                                color = if (member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)) CyberTeal else IndigoLight
                             )
                         }
                     }
                     Spacer(modifier = Modifier.width(6.dp))
+                    val isSelf = member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)
                     Text(
-                        text = if (member.id == "alex") "Alex (You)" else member.name.split(" ").first(),
+                        text = if (isSelf) "${member.name.split(" ").first()} (You)" else member.name.split(" ").first(),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextPrimary

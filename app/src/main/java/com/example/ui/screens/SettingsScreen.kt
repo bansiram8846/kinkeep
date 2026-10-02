@@ -214,7 +214,7 @@ fun SettingsScreen(
                         SettingToggleItem(
                             icon = Icons.Default.Shield,
                             title = "Emergency Nominee Access",
-                            subtitle = "Allow Elena Morgan fallback recovery protocol",
+                            subtitle = "Designated emergency contact fallback recovery protocol",
                             checked = emergencyDeadManTimer,
                             onCheckedChange = {
                                 emergencyDeadManTimer = it
@@ -244,31 +244,46 @@ fun SettingsScreen(
                         .clip(RoundedCornerShape(14.dp))
                         .background(SurfaceContainer)
                         .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                        .padding(14.dp)
+                        .padding(16.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CyberSecondaryButton3D(
-                            text = "Purge Test Data & Keep Clean Vault",
-                            icon = Icons.Default.RestartAlt,
-                            onClick = {
-                                viewModel.clearAllDocuments()
-                            },
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            testTag = "purge_test_data_button"
-                        )
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "SYSTEM INTEGRITY",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyberTeal
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(CyberTeal)
+                            )
+                        }
 
-                        CyberSecondaryButton3D(
-                            text = "Load Sample Demo Data (Optional)",
-                            icon = Icons.Default.RestartAlt,
-                            onClick = {
-                                viewModel.resetDemoData()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            testTag = "reset_demo_data_button"
+                        Text(
+                            text = "Clean Vault Protocol • Zero Test Clutter",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
                         )
 
                         Text(
-                            text = "FamilyOS Vault v2.4 • Client Build 402",
+                            text = "All documents and member profiles are strictly private, local-first, and end-to-end encrypted.",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "KinKeep Vault v2.4 • Production Client Build 402",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
                             color = TextMuted,

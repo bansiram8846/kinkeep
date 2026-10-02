@@ -68,6 +68,14 @@ fun KinKeepApp(
         }
     }
 
+    BackHandler(enabled = uiState.activeScreen != ActiveScreen.TABS) {
+        viewModel.navigateBack()
+    }
+
+    BackHandler(enabled = uiState.activeScreen == ActiveScreen.TABS && uiState.currentTab != BottomTab.VAULT) {
+        viewModel.selectTab(BottomTab.VAULT)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -201,9 +209,6 @@ fun KinKeepApp(
                 onViewDocument = { doc ->
                     viewModel.closeAlertsModal()
                     viewModel.viewDocument(doc)
-                },
-                onTriggerTestAlert = {
-                    viewModel.addSampleExpiringDocument()
                 },
                 onOpenExpiringTab = {
                     viewModel.closeAlertsModal()

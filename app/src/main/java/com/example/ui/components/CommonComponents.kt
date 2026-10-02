@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,9 +39,15 @@ import androidx.compose.material.icons.outlined.Diversity3
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -62,95 +67,139 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.AlertRedLight
 import com.example.ui.theme.CyberTeal
+import com.example.ui.theme.CyberTealBright
 import com.example.ui.theme.CyberTealDark
-import com.example.ui.theme.IndigoLight
+import com.example.ui.theme.ObsidianBackground
 import com.example.ui.theme.QuantumIndigo
 import com.example.ui.theme.SurfaceContainer
 import com.example.ui.theme.SurfaceContainerHigh
+import com.example.ui.theme.SurfaceContainerHighest
 import com.example.ui.theme.SurfaceContainerLowest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.BottomTab
 
+/**
+ * Standard Status Pill indicator
+ */
 @Composable
 fun StatusPill(
     status: String,
     daysRemaining: Int? = null,
     modifier: Modifier = Modifier
 ) {
-    when {
-        daysRemaining != null || status.equals("Expiring", ignoreCase = true) -> {
-            val text = if (daysRemaining != null) "Expires in $daysRemaining days" else "Action needed"
-            Row(
-                modifier = modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFF3B151C))
-                    .border(1.dp, Color(0xFFFF4757).copy(alpha = 0.5f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(AlertRed)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = text,
-                    color = AlertRedLight,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        status.equals("Verified", ignoreCase = true) -> {
-            Row(
-                modifier = modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(CyberTeal.copy(alpha = 0.15f))
-                    .border(1.dp, CyberTeal.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 9.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(CyberTeal)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "Verified",
-                    color = CyberTeal,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        else -> {
+    val isUrgent = daysRemaining != null && daysRemaining <= 30
+    val isExpired = daysRemaining != null && daysRemaining <= 0
+
+    val (bg, border, text, label) = when {
+        isExpired -> Quad(
+            AlertRed.copy(alpha = 0.15f),
+            AlertRed.copy(alpha = 0.5f),
+            AlertRedLight,
+            "EXPIRED"
+        )
+        isUrgent -> Quad(
+            AlertRed.copy(alpha = 0.15f),
+            AlertRed.copy(alpha = 0.5f),
+            AlertRedLight,
+            "EXPIRING (${daysRemaining}d)"
+        )
+        status == "Expiring" -> Quad(
+            Color(0xFFFFA502).copy(alpha = 0.15f),
+            Color(0xFFFFA502).copy(alpha = 0.4f),
+            Color(0xFFFFA502),
+            "EXPIRING"
+        )
+        else -> Quad(
+            CyberTeal.copy(alpha = 0.15f),
+            CyberTeal.copy(alpha = 0.4f),
+            CyberTeal,
+            "VERIFIED"
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Box(
-                modifier = modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(SurfaceContainerHigh)
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 10.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = status,
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(text)
+            )
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = text
+            )
+        }
+    }
+}
+
+private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+/**
+ * StatCard for overview screens
+ */
+@Composable
+fun StatCard(
+    title: String,
+    count: String,
+    subtitle: String,
+    subtitleColor: Color = TextSecondary,
+    isAlert: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceContainer)
+            .border(
+                1.dp,
+                if (isAlert) AlertRed.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f),
+                RoundedCornerShape(16.dp)
+            )
+            .padding(14.dp)
+    ) {
+        Column {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                color = TextSecondary,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = count,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isAlert) AlertRedLight else TextPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = subtitleColor,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
 
 /**
- * 8D Cyber Model Button with physical spring press travel, bottom 3D bevel extrusion,
- * specular reflection, and luminous cyber teal glow.
+ * 8D Tactile Primary Button with 3D extrusion, physical press response,
+ * and immediate ripple feedback for maximum reliability in both emulator and touch devices.
  */
 @Composable
 fun CyberButton3D(
@@ -165,44 +214,21 @@ fun CyberButton3D(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // 3D physical button compression
     val pressOffsetY by animateDpAsState(
-        targetValue = if (isPressed) 3.5.dp else 0.dp,
+        targetValue = if (isPressed) 3.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "pressOffset"
     )
 
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "buttonScale"
-    )
-
-    // Animated diagonal shimmer across 3D face
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "shimmerAlpha"
-    )
-
     Box(
         modifier = modifier
-            .scale(scale)
             .height(height + 4.dp)
             .testTag(testTag)
     ) {
-        // Bottom 3D extrusion slab (stationary underneath)
+        // Bottom 3D shadow/extrusion base
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -212,14 +238,14 @@ fun CyberButton3D(
                 .background(Color(0xFF005E4F))
         )
 
-        // Floating top face that physically depresses downward on touch
+        // Floating top face with responsive click & ripple
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(height)
                 .offset(y = pressOffsetY)
                 .shadow(
-                    elevation = if (isPressed) 2.dp else 8.dp,
+                    elevation = if (isPressed) 2.dp else 6.dp,
                     shape = RoundedCornerShape(14.dp),
                     spotColor = CyberTeal
                 )
@@ -245,27 +271,12 @@ fun CyberButton3D(
                 )
                 .clickable(
                     interactionSource = interactionSource,
-                    indication = null,
+                    indication = ripple(color = CyberTealDark),
                     enabled = enabled,
                     onClick = onClick
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Diagonal specular sheen
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = shimmerAlpha),
-                                Color.Transparent,
-                                Color.White.copy(alpha = shimmerAlpha * 0.4f)
-                            )
-                        )
-                    )
-            )
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -294,7 +305,7 @@ fun CyberButton3D(
 
 /**
  * 8D Secondary Tactile Button with deep obsidian 3D extrusion,
- * quantum indigo rim highlight, and physical press feedback.
+ * quantum indigo rim highlight, and responsive click handling.
  */
 @Composable
 fun CyberSecondaryButton3D(
@@ -309,10 +320,10 @@ fun CyberSecondaryButton3D(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val pressOffsetY by animateDpAsState(
-        targetValue = if (isPressed) 3.dp else 0.dp,
+        targetValue = if (isPressed) 2.5.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "pressOffsetSecondary"
     )
@@ -354,7 +365,7 @@ fun CyberSecondaryButton3D(
                 )
                 .clickable(
                     interactionSource = interactionSource,
-                    indication = null,
+                    indication = ripple(color = CyberTeal),
                     onClick = onClick
                 ),
             contentAlignment = Alignment.Center
@@ -385,7 +396,7 @@ fun CyberSecondaryButton3D(
 }
 
 /**
- * 8D Tactile Icon Button (e.g. for quick (+) add, back, or options)
+ * 8D Square Icon Button with 3D tactile extrusion
  */
 @Composable
 fun CyberIconButton3D(
@@ -401,10 +412,10 @@ fun CyberIconButton3D(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val pressOffset by animateDpAsState(
-        targetValue = if (isPressed) 2.5.dp else 0.dp,
+        targetValue = if (isPressed) 2.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "iconPressOffset"
     )
@@ -447,7 +458,7 @@ fun CyberIconButton3D(
                 )
                 .clickable(
                     interactionSource = interactionSource,
-                    indication = null,
+                    indication = ripple(color = if (isPrimary) CyberTealDark else CyberTeal),
                     onClick = onClick
                 ),
             contentAlignment = Alignment.Center
@@ -462,123 +473,128 @@ fun CyberIconButton3D(
     }
 }
 
+/**
+ * Robust Material 3 Bottom Navigation Bar with instant responsiveness,
+ * high touch accuracy for emulator and physical devices.
+ */
 @Composable
 fun KinKeepBottomNav(
     currentTab: BottomTab,
     onTabSelected: (BottomTab) -> Unit,
-    hasExpiringAlert: Boolean = true,
+    hasExpiringAlert: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(SurfaceContainerLowest)
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.06f),
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-            )
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+    NavigationBar(
+        modifier = modifier.fillMaxWidth(),
+        containerColor = SurfaceContainerLowest,
+        tonalElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BottomNavItem(
-                icon = if (currentTab == BottomTab.VAULT) Icons.Filled.Lock else Icons.Outlined.Lock,
-                label = "Vault",
-                isSelected = currentTab == BottomTab.VAULT,
-                onClick = { onTabSelected(BottomTab.VAULT) },
-                modifier = Modifier.weight(1f),
-                testTag = "nav_tab_vault"
-            )
-
-            BottomNavItem(
-                icon = if (currentTab == BottomTab.FAMILY) Icons.Filled.Diversity3 else Icons.Outlined.Diversity3,
-                label = "Family",
-                isSelected = currentTab == BottomTab.FAMILY,
-                onClick = { onTabSelected(BottomTab.FAMILY) },
-                modifier = Modifier.weight(1f),
-                testTag = "nav_tab_family"
-            )
-
-            BottomNavItem(
-                icon = if (currentTab == BottomTab.EXPIRING) Icons.Filled.Schedule else Icons.Outlined.Schedule,
-                label = "Expiring",
-                isSelected = currentTab == BottomTab.EXPIRING,
-                onClick = { onTabSelected(BottomTab.EXPIRING) },
-                hasBadge = hasExpiringAlert,
-                modifier = Modifier.weight(1f),
-                testTag = "nav_tab_expiring"
-            )
-
-            BottomNavItem(
-                icon = if (currentTab == BottomTab.SETTINGS) Icons.Filled.Settings else Icons.Outlined.Settings,
-                label = "Settings",
-                isSelected = currentTab == BottomTab.SETTINGS,
-                onClick = { onTabSelected(BottomTab.SETTINGS) },
-                modifier = Modifier.weight(1f),
-                testTag = "nav_tab_settings"
-            )
-        }
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    hasBadge: Boolean = false,
-    testTag: String
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1.0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "navItemScale"
-    )
-
-    Column(
-        modifier = modifier
-            .scale(scale)
-            .testTag(testTag)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) SurfaceContainerHigh else Color.Transparent)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(contentAlignment = Alignment.TopEnd) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) CyberTeal else TextMuted,
-                modifier = Modifier.size(20.dp)
-            )
-            if (hasBadge && !isSelected) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(AlertRed)
+        NavigationBarItem(
+            selected = currentTab == BottomTab.VAULT,
+            onClick = { onTabSelected(BottomTab.VAULT) },
+            icon = {
+                Icon(
+                    imageVector = if (currentTab == BottomTab.VAULT) Icons.Filled.Lock else Icons.Outlined.Lock,
+                    contentDescription = "Vault"
                 )
-            }
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            color = if (isSelected) CyberTeal else TextMuted,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+            },
+            label = {
+                Text(
+                    text = "Vault",
+                    fontWeight = if (currentTab == BottomTab.VAULT) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = CyberTealDark,
+                selectedTextColor = CyberTeal,
+                indicatorColor = CyberTeal,
+                unselectedIconColor = TextMuted,
+                unselectedTextColor = TextMuted
+            ),
+            modifier = Modifier.testTag("nav_tab_vault")
+        )
+
+        NavigationBarItem(
+            selected = currentTab == BottomTab.FAMILY,
+            onClick = { onTabSelected(BottomTab.FAMILY) },
+            icon = {
+                Icon(
+                    imageVector = if (currentTab == BottomTab.FAMILY) Icons.Filled.Diversity3 else Icons.Outlined.Diversity3,
+                    contentDescription = "Family"
+                )
+            },
+            label = {
+                Text(
+                    text = "Family",
+                    fontWeight = if (currentTab == BottomTab.FAMILY) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = CyberTealDark,
+                selectedTextColor = CyberTeal,
+                indicatorColor = CyberTeal,
+                unselectedIconColor = TextMuted,
+                unselectedTextColor = TextMuted
+            ),
+            modifier = Modifier.testTag("nav_tab_family")
+        )
+
+        NavigationBarItem(
+            selected = currentTab == BottomTab.EXPIRING,
+            onClick = { onTabSelected(BottomTab.EXPIRING) },
+            icon = {
+                BadgedBox(
+                    badge = {
+                        if (hasExpiringAlert) {
+                            Badge(containerColor = AlertRed)
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (currentTab == BottomTab.EXPIRING) Icons.Filled.Schedule else Icons.Outlined.Schedule,
+                        contentDescription = "Expiring"
+                    )
+                }
+            },
+            label = {
+                Text(
+                    text = "Expiring",
+                    fontWeight = if (currentTab == BottomTab.EXPIRING) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = CyberTealDark,
+                selectedTextColor = CyberTeal,
+                indicatorColor = CyberTeal,
+                unselectedIconColor = TextMuted,
+                unselectedTextColor = TextMuted
+            ),
+            modifier = Modifier.testTag("nav_tab_expiring")
+        )
+
+        NavigationBarItem(
+            selected = currentTab == BottomTab.SETTINGS,
+            onClick = { onTabSelected(BottomTab.SETTINGS) },
+            icon = {
+                Icon(
+                    imageVector = if (currentTab == BottomTab.SETTINGS) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    contentDescription = "Settings"
+                )
+            },
+            label = {
+                Text(
+                    text = "Settings",
+                    fontWeight = if (currentTab == BottomTab.SETTINGS) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = CyberTealDark,
+                selectedTextColor = CyberTeal,
+                indicatorColor = CyberTeal,
+                unselectedIconColor = TextMuted,
+                unselectedTextColor = TextMuted
+            ),
+            modifier = Modifier.testTag("nav_tab_settings")
         )
     }
 }

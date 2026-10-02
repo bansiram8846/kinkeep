@@ -97,8 +97,8 @@ fun ElenaVaultScreen(
     val allDocs by viewModel.allDocuments.collectAsState()
     val members by viewModel.allMembers.collectAsState()
 
-    val currentMember = members.find { it.id == uiState.selectedMemberId } ?: members.find { it.id == "elena" }
-    val memberDocs = allDocs.filter { it.memberId == (currentMember?.id ?: "elena") }
+    val currentMember = members.find { it.id == uiState.selectedMemberId } ?: members.firstOrNull()
+    val memberDocs = allDocs.filter { it.memberId == currentMember?.id }
 
     val activeCategory = uiState.memberCategoryFilter
 
@@ -126,10 +126,10 @@ fun ElenaVaultScreen(
     ) {
         // Top App Bar
         TopVaultHeader(
-            memberName = currentMember?.name ?: "Elena Morgan",
+            memberName = currentMember?.name ?: "Family Member",
             onBack = onBack,
             onShareAll = {
-                viewModel.showToast("Exporting encrypted archive for ${currentMember?.name ?: "Elena"}")
+                viewModel.showToast("Exporting encrypted archive for ${currentMember?.name ?: "Family Member"}")
             }
         )
 
@@ -143,15 +143,15 @@ fun ElenaVaultScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 MemberProfileCard(
-                    name = currentMember?.name ?: "Elena Morgan",
-                    role = currentMember?.role ?: "Co-Organizer",
-                    avatarUrl = currentMember?.avatarUrl ?: DefaultVaultData.ELENA_AVATAR_URL,
+                    name = currentMember?.name ?: "Family Member",
+                    role = currentMember?.role ?: "Member",
+                    avatarUrl = currentMember?.avatarUrl,
                     docCount = memberDocs.size,
                     onShareAll = {
                         viewModel.showToast("Preparing zero-knowledge share package...")
                     },
                     onAddDoc = {
-                        onAddDocument(currentMember?.id ?: "elena")
+                        onAddDocument(currentMember?.id ?: "organizer")
                     }
                 )
             }
@@ -218,9 +218,9 @@ fun ElenaVaultScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 CyberButton3D(
-                    text = "+ Add to ${currentMember?.name?.split(" ")?.firstOrNull() ?: "Elena"}'s Docs",
+                    text = "+ Add to ${currentMember?.name?.split(" ")?.firstOrNull() ?: "Member"}'s Docs",
                     icon = Icons.Default.AddCircle,
-                    onClick = { onAddDocument(currentMember?.id ?: "elena") },
+                    onClick = { onAddDocument(currentMember?.id ?: "organizer") },
                     modifier = Modifier.fillMaxWidth(),
                     testTag = "add_to_member_docs_button"
                 )
@@ -285,7 +285,7 @@ private fun TopVaultHeader(
                     )
                 }
                 Text(
-                    text = "${memberName.split(" ").firstOrNull() ?: "Elena"}'s Vault",
+                    text = "${memberName.split(" ").firstOrNull() ?: "Member"}'s Vault",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
@@ -324,7 +324,7 @@ private fun TopVaultHeader(
 private fun MemberProfileCard(
     name: String,
     role: String,
-    avatarUrl: String,
+    avatarUrl: String? = null,
     docCount: Int,
     onShareAll: () -> Unit,
     onAddDoc: () -> Unit
@@ -351,12 +351,21 @@ private fun MemberProfileCard(
                         .background(SurfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (avatarUrl != null) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Text(
+                            text = name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").ifEmpty { "EM" },
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberTeal
+                        )
+                    }
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)

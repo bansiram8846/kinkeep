@@ -58,9 +58,4 @@ class VaultRepository(private val vaultDao: VaultDao) {
     suspend fun clearAllDocuments() = withContext(Dispatchers.IO) {
         vaultDao.clearAllDocuments()
     }
-
-    suspend fun resetToDemoData() = withContext(Dispatchers.IO) {
-        vaultDao.insertMembers(DefaultVaultData.members)
-        vaultDao.insertDocuments(DefaultVaultData.documents)
-    }
 }

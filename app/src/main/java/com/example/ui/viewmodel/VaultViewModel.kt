@@ -32,7 +32,7 @@ enum class ActiveScreen {
 data class VaultUiState(
     val currentTab: BottomTab = BottomTab.VAULT,
     val activeScreen: ActiveScreen = ActiveScreen.TABS,
-    val selectedMemberId: String = "elena",
+    val selectedMemberId: String = "organizer",
     val memberCategoryFilter: String = "All",
     val dashboardCategoryFilter: String = "All",
     val viewerDocument: VaultDocumentEntity? = null,
@@ -250,22 +250,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addSampleExpiringDocument() {
-        val expiryTimestamp = ExpirationUtils.getTimestampAfterDays(18)
-        val expiryDateStr = ExpirationUtils.formatDate(expiryTimestamp)
-        saveDocument(
-            name = "KTM Duke 390 Insurance",
-            category = "Vehicles & Auto",
-            provider = "Bajaj Allianz",
-            docNumber = "BIKE-883921-X",
-            memberId = "elena",
-            expiryDate = expiryDateStr,
-            remindExpiry = true,
-            requireBiometric = false,
-            tags = listOf("#vehicle", "#insurance", "#urgent"),
-            fileSizeText = "$128 / yr",
-            expiryTimestamp = expiryTimestamp,
-            reminderDaysBefore = 30
-        )
+        showToast("Vault is operating in clean mode with zero test documents")
     }
 
     fun addFamilyMember(
@@ -317,10 +302,33 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun resetDemoData() {
-        viewModelScope.launch {
-            repository.resetToDemoData()
-            showToast("Reset to pristine FamilyOS demo data")
-        }
+    fun saveScannedDocument(
+        name: String,
+        memberId: String,
+        category: String = "Identity & IDs",
+        provider: String = "National Issuing Authority",
+        docNumber: String? = null,
+        photoUri: String? = null
+    ) {
+        val calculatedExpiry = ExpirationUtils.getTimestampAfterDays(365)
+        val expiryDateStr = ExpirationUtils.formatDate(calculatedExpiry)
+        val generatedDocNumber = docNumber ?: ("SCAN-" + System.currentTimeMillis().toString().takeLast(6))
+
+        saveDocument(
+            name = name,
+            category = category,
+            provider = provider,
+            docNumber = generatedDocNumber,
+            memberId = memberId,
+            expiryDate = expiryDateStr,
+            remindExpiry = true,
+            requireBiometric = false,
+            tags = listOf("#scanned", "#camera", "#encrypted"),
+            fileUri = photoUri,
+            fileSizeText = "1.8 MB (Encrypted Scan)",
+            expiryTimestamp = calculatedExpiry,
+            reminderDaysBefore = 30
+        )
+        showToast("📷 Document captured & encrypted! 30-day early alert active (Expires: $expiryDateStr)")
     }
 }

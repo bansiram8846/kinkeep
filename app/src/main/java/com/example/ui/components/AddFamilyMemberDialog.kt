@@ -69,12 +69,6 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
-data class AvatarPreset(
-    val id: String,
-    val label: String,
-    val imageUrl: String
-)
-
 @Composable
 fun AddFamilyMemberDialog(
     onDismiss: () -> Unit,
@@ -93,42 +87,6 @@ fun AddFamilyMemberDialog(
         if (uri != null) {
             selectedAvatarUrl = uri.toString()
         }
-    }
-
-    // High quality avatar presets for immediate one-tap visual feedback
-    val avatarPresets = remember {
-        listOf(
-            AvatarPreset(
-                "elena",
-                "Elena / Mom",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuCG6PejAm7XdgMmDZPpR05CnMzWMKmzItG7qIiLK2grODN3tI7b8b48Z5S1eFUZfNmARrdXUJb9k55gfaUqWpQwCluVSZIeFvzYuckFb2laYiYfAzs8YiCwb2rjaD5qkUyC3ht5mMnPRXtE52OzgQBUZX1MU_z8uU8v8mxPacmCKht_84T2liTJd8siKR7qGAWNAynV71eUR7Cecua1s1A1h0guWMkDGGr4jKuqERi6iAcLONCcXfaf"
-            ),
-            AvatarPreset(
-                "dad",
-                "Jordan / Dad",
-                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80"
-            ),
-            AvatarPreset(
-                "child_boy",
-                "Leo / Son",
-                "https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?auto=format&fit=crop&w=256&q=80"
-            ),
-            AvatarPreset(
-                "child_girl",
-                "Maya / Daughter",
-                "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=256&q=80"
-            ),
-            AvatarPreset(
-                "elder",
-                "Grandparent",
-                "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=256&q=80"
-            ),
-            AvatarPreset(
-                "pet",
-                "Family Pet",
-                "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=256&q=80"
-            )
-        )
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -251,7 +209,7 @@ fun AddFamilyMemberDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Tap to upload photo from device",
+                    text = "Tap circle or icon to pick photo from device",
                     fontSize = 11.sp,
                     color = CyberTeal,
                     fontWeight = FontWeight.Medium,
@@ -261,68 +219,6 @@ fun AddFamilyMemberDialog(
                         )
                     }
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Or choose from presets
-                Text(
-                    text = "OR CHOOSE AVATAR PRESET",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    letterSpacing = 0.5.sp
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(avatarPresets) { preset ->
-                        val isSelected = selectedAvatarUrl == preset.imageUrl
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(SurfaceContainerHighest)
-                                .border(
-                                    2.dp,
-                                    if (isSelected) CyberTeal else Color.White.copy(alpha = 0.15f),
-                                    CircleShape
-                                )
-                                .clickable {
-                                    selectedAvatarUrl = preset.imageUrl
-                                    if (name.isBlank() && preset.label.contains("/")) {
-                                        name = preset.label.split("/").first().trim()
-                                    }
-                                }
-                        ) {
-                            AsyncImage(
-                                model = preset.imageUrl,
-                                contentDescription = preset.label,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            if (isSelected) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(CyberTeal.copy(alpha = 0.3f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 

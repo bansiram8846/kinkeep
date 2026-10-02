@@ -622,7 +622,6 @@ fun ExpirationAlertsDialog(
     onDismiss: () -> Unit,
     onRenew: (VaultDocumentEntity) -> Unit,
     onViewDocument: (VaultDocumentEntity) -> Unit,
-    onTriggerTestAlert: () -> Unit,
     onOpenExpiringTab: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -722,33 +721,6 @@ fun ExpirationAlertsDialog(
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Button(
-                        onClick = onTriggerTestAlert,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AlertRed.copy(alpha = 0.15f),
-                            contentColor = AlertRedLight
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, AlertRed.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(42.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "⚡ Simulate 30-Day Alert (Test Mode)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 } else {
                     Box(

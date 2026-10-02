@@ -155,15 +155,6 @@ fun ExpiringScreen(
                                 color = TextSecondary,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            CyberSecondaryButton3D(
-                                text = "⚡ Simulate 30-Day Alert (Test Mode)",
-                                icon = Icons.Default.Warning,
-                                onClick = { viewModel.addSampleExpiringDocument() },
-                                modifier = Modifier.fillMaxWidth()
-                            )
                         }
                     }
                 }
