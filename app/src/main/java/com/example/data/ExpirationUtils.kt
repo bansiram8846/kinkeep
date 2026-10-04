@@ -15,7 +15,7 @@ object ExpirationUtils {
     fun parseDate(dateStr: String): Long? {
         return try {
             dateFormat.parse(dateStr)?.time
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -9,37 +8,31 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -55,12 +48,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.data.model.VaultDocumentEntity
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.AlertRedLight
@@ -178,35 +173,6 @@ fun BiometricAuthDialog(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SurfaceContainerLowest)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                        .padding(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "CIPHER: AES-GCM-256",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            color = TextMuted
-                        )
-                        Text(
-                            text = "ZERO-KNOWLEDGE",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            color = CyberTeal
-                        )
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
@@ -262,6 +228,10 @@ fun BiometricAuthDialog(
     }
 }
 
+/**
+ * In-App Document Viewer Dialog.
+ * Renders the document directly within the app without requiring any downloads.
+ */
 @Composable
 fun DocumentViewerDialog(
     document: VaultDocumentEntity,
@@ -269,19 +239,24 @@ fun DocumentViewerDialog(
     onDelete: (String) -> Unit,
     onShare: (VaultDocumentEntity) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(22.dp),
             color = SurfaceContainerLow,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
-            modifier = Modifier.testTag("document_viewer_dialog")
+            border = androidx.compose.foundation.BorderStroke(1.dp, CyberTeal.copy(alpha = 0.35f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 680.dp)
+                .testTag("document_viewer_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // Header
+                // Header with in-app decryption indicator
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -290,29 +265,45 @@ fun DocumentViewerDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(CyberTeal.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Verified,
+                                imageVector = Icons.Default.Visibility,
                                 contentDescription = null,
                                 tint = CyberTeal,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "IN-APP VIEWER",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyberTeal
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF00382E))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "NO DOWNLOAD REQUIRED",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyberTeal
+                                    )
+                                }
+                            }
                             Text(
-                                text = "DECRYPTED RECORD",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CyberTeal
-                            )
-                            Text(
-                                text = document.memberName,
+                                text = "Vault Member: ${document.memberName}",
                                 fontSize = 12.sp,
                                 color = TextMuted
                             )
@@ -331,169 +322,219 @@ fun DocumentViewerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Card Preview Mock
-                Box(
+                // Scrollable In-App Document Canvas
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    SurfaceContainerHighest,
-                                    Color(0xFF161922)
-                                )
-                            )
-                        )
-                        .border(1.dp, CyberTeal.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .padding(16.dp)
+                        .weight(1f, fill = false)
+                        .verticalScroll(scrollState)
                 ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
+                    // Document Visual Container
+                    if (!document.fileUri.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(SurfaceContainerHighest)
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            AsyncImage(
+                                model = document.fileUri,
+                                contentDescription = document.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(8.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
                                 Text(
-                                    text = document.name,
-                                    fontSize = 16.sp,
+                                    text = "LIVE RENDER",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    text = document.provider,
-                                    fontSize = 12.sp,
-                                    color = TextSecondary
+                                    color = CyberTeal
                                 )
                             }
-                            StatusPill(
-                                status = document.status,
-                                daysRemaining = document.daysRemaining
-                            )
                         }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Text(
-                            text = "IDENTIFIER / POLICY REF",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            color = TextMuted
-                        )
-                        Text(
-                            text = document.policyOrIdNumber,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CyberTeal
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    } else {
+                        // High-fidelity digital security card canvas rendered in-app
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF192030),
+                                            Color(0xFF10141F),
+                                            Color(0xFF0C0E17)
+                                        )
+                                    )
+                                )
+                                .border(1.dp, CyberTeal.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
                         ) {
                             Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = document.name,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = document.provider,
+                                            fontSize = 12.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                    StatusPill(
+                                        status = document.status,
+                                        daysRemaining = document.daysRemaining
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
                                 Text(
-                                    text = "VALIDITY / EXPIRY",
+                                    text = "OFFICIAL RECORD / IDENTIFIER",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp,
                                     color = TextMuted
                                 )
                                 Text(
-                                    text = document.expiryDate,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = TextPrimary
+                                    text = document.policyOrIdNumber,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyberTeal
                                 )
-                            }
-                            document.metricText?.let { metric ->
-                                Column(horizontalAlignment = Alignment.End) {
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "VALID THROUGH / EXPIRY",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            color = TextMuted
+                                        )
+                                        Text(
+                                            text = document.expiryDate,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = TextPrimary
+                                        )
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "CATEGORY",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            color = TextMuted
+                                        )
+                                        Text(
+                                            text = document.category,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = IndigoLight
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Holographic simulated security strip
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(18.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(
+                                                    Color(0xFF5FFFEF).copy(alpha = 0.3f),
+                                                    QuantumIndigo.copy(alpha = 0.35f),
+                                                    Color(0xFFFFB020).copy(alpha = 0.25f),
+                                                    CyberTeal.copy(alpha = 0.3f)
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
-                                        text = "VALUE / SPECS",
+                                        text = "AUTHENTICATED VAULT CERTIFICATE • ENCRYPTED PAYLOAD",
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        color = TextMuted
-                                    )
-                                    Text(
-                                        text = metric,
-                                        fontSize = 13.sp,
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (metric.contains("$")) CyberTeal else TextPrimary
+                                        color = TextPrimary.copy(alpha = 0.9f)
                                     )
                                 }
                             }
                         }
                     }
-                }
 
-                if (!document.sharedNotes.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(QuantumIndigo.copy(alpha = 0.12f))
-                            .border(1.dp, QuantumIndigo.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "🔐 ${document.sharedNotes}",
-                            fontSize = 12.sp,
-                            color = IndigoLight
-                        )
+                    if (!document.sharedNotes.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(QuantumIndigo.copy(alpha = 0.12f))
+                                .border(1.dp, QuantumIndigo.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "🔐 Notes: ${document.sharedNotes}",
+                                fontSize = 12.sp,
+                                color = IndigoLight
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Actions
+                // In-App Action Controls (Share and Close, Delete)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Button(
+                    CyberSecondaryButton3D(
+                        text = "Share Secure Link",
+                        icon = Icons.Default.Share,
                         onClick = { onShare(document) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceContainerHigh,
-                            contentColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Share", fontSize = 13.sp)
-                    }
+                        modifier = Modifier.weight(1f),
+                        height = 42.dp,
+                        testTag = "viewer_share_button"
+                    )
 
-                    Button(
+                    CyberButton3D(
+                        text = "Close Viewer",
+                        icon = Icons.Default.Close,
                         onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CyberTeal,
-                            contentColor = CyberTealDark
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Download", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
+                        modifier = Modifier.weight(1f),
+                        height = 42.dp,
+                        testTag = "viewer_close_button"
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -505,6 +546,7 @@ fun DocumentViewerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(38.dp)
+                        .testTag("viewer_delete_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -598,272 +640,13 @@ fun ShareDocumentDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
+                CyberButton3D(
+                    text = "Copy Encrypted Link",
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CyberTeal,
-                        contentColor = CyberTealDark
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                ) {
-                    Text(text = "Copy Encrypted Link", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ExpirationAlertsDialog(
-    expiringDocuments: List<VaultDocumentEntity>,
-    onDismiss: () -> Unit,
-    onRenew: (VaultDocumentEntity) -> Unit,
-    onViewDocument: (VaultDocumentEntity) -> Unit,
-    onOpenExpiringTab: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = SurfaceContainerLow,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (expiringDocuments.isNotEmpty()) AlertRed.copy(alpha = 0.5f) else CyberTeal.copy(alpha = 0.35f)
-            ),
-            modifier = Modifier.testTag("expiration_alerts_dialog")
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                // Header
-                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (expiringDocuments.isNotEmpty()) Color(0xFF3B151C) else CyberTeal.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (expiringDocuments.isNotEmpty()) Icons.Default.NotificationsActive else Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = if (expiringDocuments.isNotEmpty()) AlertRedLight else CyberTeal,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "30-Day Alert Radar",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Proactive Expiration Monitor",
-                                fontSize = 11.sp,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                if (expiringDocuments.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceContainerLowest)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                            .padding(18.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = CyberTeal,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Text(
-                                text = "All Documents Protected",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Zero records expiring within 30 days. KinKeep will automatically alert you when a document reaches the 30-day window.",
-                                fontSize = 12.sp,
-                                color = TextSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF3B151C))
-                            .border(1.dp, AlertRed.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "⚠️ ${expiringDocuments.size} record(s) expire within 30 days! Immediate renewal recommended.",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlertRedLight
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                    ) {
-                        items(expiringDocuments) { doc ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(SurfaceContainerLowest)
-                                    .border(1.dp, AlertRed.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = doc.name,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
-                                            )
-                                            Text(
-                                                text = "${doc.memberName} • ${doc.provider}",
-                                                fontSize = 11.sp,
-                                                color = TextSecondary
-                                            )
-                                        }
-
-                                        val days = doc.daysRemaining ?: 0
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(999.dp))
-                                                .background(Color(0xFF3B151C))
-                                                .border(1.dp, AlertRed, RoundedCornerShape(999.dp))
-                                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = if (days < 0) "Expired" else "$days days left",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = AlertRedLight
-                                            )
-                                        }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Button(
-                                            onClick = { onRenew(doc) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = CyberTeal,
-                                                contentColor = CyberTealDark
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Autorenew,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = "Renew (+1 Yr)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-
-                                        Button(
-                                            onClick = {
-                                                onDismiss()
-                                                onViewDocument(doc)
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = SurfaceContainerHigh,
-                                                contentColor = TextPrimary
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Visibility,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(text = "View", fontSize = 11.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Button(
-                        onClick = {
-                            onDismiss()
-                            onOpenExpiringTab()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SurfaceContainerHigh,
-                            contentColor = CyberTeal
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(42.dp)
-                    ) {
-                        Text(text = "Open Full Renewal Radar", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
+                    height = 42.dp,
+                    testTag = "copy_encrypted_link_button"
+                )
             }
         }
     }

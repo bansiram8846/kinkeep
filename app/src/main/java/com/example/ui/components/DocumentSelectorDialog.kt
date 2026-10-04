@@ -15,24 +15,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,44 +37,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.VaultDocumentEntity
-import com.example.ui.theme.AlertRed
-import com.example.ui.theme.AlertRedLight
 import com.example.ui.theme.CyberTeal
-import com.example.ui.theme.CyberTealDark
-import com.example.ui.theme.SurfaceContainer
-import com.example.ui.theme.SurfaceContainerHighest
+import com.example.ui.theme.SurfaceContainerHigh
 import com.example.ui.theme.SurfaceContainerLow
-import com.example.ui.theme.SurfaceContainerLowest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 @Composable
 fun DocumentSelectorDialog(
-    allDocuments: List<VaultDocumentEntity>,
-    initialCategory: String = "All",
-    onSelectDocument: (VaultDocumentEntity) -> Unit,
-    onAddNewDocument: () -> Unit,
-    onDismiss: () -> Unit
+    documents: List<VaultDocumentEntity>,
+    category: String,
+    onDismiss: () -> Unit,
+    onSelectDocument: (VaultDocumentEntity) -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(initialCategory) }
-
-    val categories = listOf("All", "Identity", "Vehicles", "Insurance", "Property")
-
-    val filteredDocs = when (selectedCategory) {
-        "Identity" -> allDocuments.filter { it.category.contains("Identity", ignoreCase = true) }
-        "Vehicles" -> allDocuments.filter { it.category.contains("Vehicles", ignoreCase = true) }
-        "Insurance" -> allDocuments.filter { it.category.contains("Insurance", ignoreCase = true) || it.name.contains("Insurance", ignoreCase = true) }
-        "Property" -> allDocuments.filter { it.category.contains("Property", ignoreCase = true) }
-        else -> allDocuments
-    }
-
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(20.dp),
             color = SurfaceContainerLow,
             border = androidx.compose.foundation.BorderStroke(1.dp, CyberTeal.copy(alpha = 0.35f)),
-            modifier = Modifier.testTag("document_selector_dialog")
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .testTag("document_selector_dialog")
         ) {
             Column(
                 modifier = Modifier
@@ -94,35 +72,18 @@ fun DocumentSelectorDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(CyberTeal.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Description,
-                                contentDescription = null,
-                                tint = CyberTeal,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Select & View Document",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Tap any record to decrypt and view",
-                                fontSize = 11.sp,
-                                color = TextSecondary
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "Select Document to View",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (category == "All") "All Decrypted Records (${documents.size})" else "$category (${documents.size})",
+                            fontSize = 12.sp,
+                            color = CyberTeal
+                        )
                     }
 
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -137,191 +98,81 @@ fun DocumentSelectorDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Category Filter Pills
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(categories) { cat ->
-                        val isSelected = selectedCategory.equals(cat, ignoreCase = true)
-                        val count = when (cat) {
-                            "Identity" -> allDocuments.count { it.category.contains("Identity", ignoreCase = true) }
-                            "Vehicles" -> allDocuments.count { it.category.contains("Vehicles", ignoreCase = true) }
-                            "Insurance" -> allDocuments.count { it.category.contains("Insurance", ignoreCase = true) || it.name.contains("Insurance", ignoreCase = true) }
-                            "Property" -> allDocuments.count { it.category.contains("Property", ignoreCase = true) }
-                            else -> allDocuments.size
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(if (isSelected) CyberTeal else SurfaceContainerHighest)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) CyberTeal else Color.White.copy(alpha = 0.12f),
-                                    RoundedCornerShape(999.dp)
-                                )
-                                .clickable { selectedCategory = cat }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "$cat ($count)",
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) CyberTealDark else TextPrimary
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Documents List
-                if (filteredDocs.isEmpty()) {
+                if (documents.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(140.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(SurfaceContainerLowest)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                            .padding(24.dp),
+                            .background(Color.White.copy(alpha = 0.03f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Description,
-                                contentDescription = null,
-                                tint = CyberTeal,
-                                modifier = Modifier.size(36.dp)
-                            )
-                            Text(
-                                text = "No documents found",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "No documents in $selectedCategory category yet. Tap below to upload or scan a new document.",
-                                fontSize = 11.sp,
-                                color = TextSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
+                        Text(
+                            text = "No documents found in this section.",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
                     }
                 } else {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(filteredDocs) { doc ->
-                            val isUrgent = doc.isActionNeeded || (doc.daysRemaining != null && doc.daysRemaining <= 30)
-
-                            Box(
+                        items(documents, key = { it.id }) { doc ->
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(SurfaceContainerLowest)
-                                    .border(
-                                        1.dp,
-                                        if (isUrgent) AlertRed.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.08f),
-                                        RoundedCornerShape(12.dp)
-                                    )
+                                    .background(SurfaceContainerHigh)
+                                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
                                     .clickable {
-                                        onDismiss()
                                         onSelectDocument(doc)
+                                        onDismiss()
                                     }
-                                    .padding(12.dp)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = doc.name,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
-                                            )
-                                            if (doc.requireBiometric) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = "Encrypted",
-                                                    tint = CyberTeal,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(CyberTeal.copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Description,
+                                            contentDescription = null,
+                                            tint = CyberTeal,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column {
                                         Text(
-                                            text = "${doc.memberName} • ${doc.provider}",
+                                            text = doc.name,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = "${doc.memberName} • Expiry: ${doc.expiryDate}",
                                             fontSize = 11.sp,
                                             color = TextSecondary
                                         )
-                                        Text(
-                                            text = "Ref: ${doc.policyOrIdNumber} • Exp: ${doc.expiryDate}",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            color = if (isUrgent) AlertRedLight else TextMuted
-                                        )
-                                    }
-
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        StatusPill(status = doc.status, daysRemaining = doc.daysRemaining)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(CyberTeal.copy(alpha = 0.15f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Visibility,
-                                                contentDescription = "Open Document",
-                                                tint = CyberTeal,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
                                     }
                                 }
+
+                                StatusPill(status = doc.status, daysRemaining = doc.daysRemaining)
                             }
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Floating 8D Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CyberSecondaryButton3D(
-                        text = "Close",
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        height = 42.dp
-                    )
-
-                    CyberButton3D(
-                        text = "+ Add Document",
-                        icon = Icons.Default.Add,
-                        onClick = {
-                            onDismiss()
-                            onAddNewDocument()
-                        },
-                        modifier = Modifier.weight(1.2f),
-                        height = 42.dp
-                    )
                 }
             }
         }

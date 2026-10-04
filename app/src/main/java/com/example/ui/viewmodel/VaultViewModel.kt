@@ -1,13 +1,14 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.DefaultVaultData
 import com.example.data.ExpirationUtils
 import com.example.data.local.VaultDatabase
 import com.example.data.model.FamilyMemberEntity
 import com.example.data.model.VaultDocumentEntity
-import com.example.data.repository.VaultRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,169 +18,81 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 enum class BottomTab {
-    VAULT,
+    DASHBOARD,
     FAMILY,
     EXPIRING,
     SETTINGS
 }
 
-enum class ActiveScreen {
-    TABS,
-    MEMBER_VAULT,
-    UPLOAD_DOCUMENT
-}
-
-data class VaultUiState(
-    val currentTab: BottomTab = BottomTab.VAULT,
-    val activeScreen: ActiveScreen = ActiveScreen.TABS,
-    val selectedMemberId: String = "organizer",
-    val memberCategoryFilter: String = "All",
-    val dashboardCategoryFilter: String = "All",
-    val viewerDocument: VaultDocumentEntity? = null,
-    val isBiometricModalOpen: Boolean = false,
-    val isBiometricAuthenticated: Boolean = false,
-    val toastMessage: String? = null,
-    val shareDialogDoc: VaultDocumentEntity? = null,
-    val isAlertsModalOpen: Boolean = false
-)
-
 class VaultViewModel(application: Application) : AndroidViewModel(application) {
+    private val database = VaultDatabase.getDatabase(application, viewModelScope)
+    private val dao = database.vaultDao()
 
-    private val repository: VaultRepository
+    val allDocuments: StateFlow<List<VaultDocumentEntity>> = dao.getAllDocuments()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val allMembers: StateFlow<List<FamilyMemberEntity>>
-    val allDocuments: StateFlow<List<VaultDocumentEntity>>
-    val expiringDocuments: StateFlow<List<VaultDocumentEntity>>
+    val allMembers: StateFlow<List<FamilyMemberEntity>> = dao.getAllMembers()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _uiState = MutableStateFlow(VaultUiState())
-    val uiState: StateFlow<VaultUiState> = _uiState.asStateFlow()
+    private val _currentTab = MutableStateFlow(BottomTab.DASHBOARD)
+    val currentTab: StateFlow<BottomTab> = _currentTab.asStateFlow()
 
-    init {
-        val database = VaultDatabase.getDatabase(application, viewModelScope)
-        repository = VaultRepository(database.vaultDao())
+    private val _selectedDocumentForView = MutableStateFlow<VaultDocumentEntity?>(null)
+    val selectedDocumentForView: StateFlow<VaultDocumentEntity?> = _selectedDocumentForView.asStateFlow()
 
-        viewModelScope.launch {
-            repository.ensureInitialData()
-        }
+    private val _selectedDocumentForShare = MutableStateFlow<VaultDocumentEntity?>(null)
+    val selectedDocumentForShare: StateFlow<VaultDocumentEntity?> = _selectedDocumentForShare.asStateFlow()
 
-        allMembers = repository.allMembers
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _isUploadScreenOpen = MutableStateFlow(false)
+    val isUploadScreenOpen: StateFlow<Boolean> = _isUploadScreenOpen.asStateFlow()
 
-        allDocuments = repository.allDocuments
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _uploadPreselectedMemberId = MutableStateFlow<String?>(null)
+    val uploadPreselectedMemberId: StateFlow<String?> = _uploadPreselectedMemberId.asStateFlow()
 
-        expiringDocuments = repository.expiringDocuments
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    }
+    private val _uploadPreselectedCategory = MutableStateFlow<String?>(null)
+    val uploadPreselectedCategory: StateFlow<String?> = _uploadPreselectedCategory.asStateFlow()
+
+    private val _memberCategoryFilter = MutableStateFlow("All")
+    val memberCategoryFilter: StateFlow<String> = _memberCategoryFilter.asStateFlow()
 
     fun selectTab(tab: BottomTab) {
-        _uiState.value = _uiState.value.copy(
-            currentTab = tab,
-            activeScreen = ActiveScreen.TABS
-        )
+        _currentTab.value = tab
     }
 
-    fun openMemberVault(memberId: String) {
-        _uiState.value = _uiState.value.copy(
-            selectedMemberId = memberId,
-            memberCategoryFilter = "All",
-            activeScreen = ActiveScreen.MEMBER_VAULT
-        )
+    fun openUploadScreen(memberId: String? = null, category: String? = null) {
+        _uploadPreselectedMemberId.value = memberId
+        _uploadPreselectedCategory.value = category
+        _isUploadScreenOpen.value = true
     }
 
-    fun openUpload(memberId: String = _uiState.value.selectedMemberId) {
-        _uiState.value = _uiState.value.copy(
-            selectedMemberId = memberId,
-            activeScreen = ActiveScreen.UPLOAD_DOCUMENT
-        )
-    }
-
-    fun navigateBack(): Boolean {
-        return if (_uiState.value.activeScreen != ActiveScreen.TABS) {
-            _uiState.value = _uiState.value.copy(activeScreen = ActiveScreen.TABS)
-            true
-        } else {
-            false
-        }
-    }
-
-    fun setMemberCategoryFilter(filter: String) {
-        _uiState.value = _uiState.value.copy(memberCategoryFilter = filter)
-    }
-
-    fun setDashboardCategoryFilter(category: String) {
-        _uiState.value = _uiState.value.copy(dashboardCategoryFilter = category)
-    }
-
-    fun openAlertsModal() {
-        _uiState.value = _uiState.value.copy(isAlertsModalOpen = true)
-    }
-
-    fun closeAlertsModal() {
-        _uiState.value = _uiState.value.copy(isAlertsModalOpen = false)
+    fun closeUploadScreen() {
+        _isUploadScreenOpen.value = false
+        _uploadPreselectedMemberId.value = null
+        _uploadPreselectedCategory.value = null
     }
 
     fun viewDocument(doc: VaultDocumentEntity) {
-        if (doc.requireBiometric) {
-            _uiState.value = _uiState.value.copy(
-                viewerDocument = doc,
-                isBiometricModalOpen = true,
-                isBiometricAuthenticated = false
-            )
-        } else {
-            _uiState.value = _uiState.value.copy(
-                viewerDocument = doc,
-                isBiometricModalOpen = false,
-                isBiometricAuthenticated = true
-            )
-        }
+        _selectedDocumentForView.value = doc
     }
 
-    fun authenticateBiometric() {
-        _uiState.value = _uiState.value.copy(
-            isBiometricAuthenticated = true,
-            isBiometricModalOpen = false
-        )
-    }
-
-    fun dismissViewer() {
-        _uiState.value = _uiState.value.copy(
-            viewerDocument = null,
-            isBiometricModalOpen = false,
-            isBiometricAuthenticated = false
-        )
+    fun closeDocumentViewer() {
+        _selectedDocumentForView.value = null
     }
 
     fun openShare(doc: VaultDocumentEntity) {
-        _uiState.value = _uiState.value.copy(shareDialogDoc = doc)
+        _selectedDocumentForShare.value = doc
     }
 
-    fun dismissShare() {
-        _uiState.value = _uiState.value.copy(shareDialogDoc = null)
+    fun closeShare() {
+        _selectedDocumentForShare.value = null
     }
 
-    fun renewPolicy(doc: VaultDocumentEntity) {
-        viewModelScope.launch {
-            val newTimestamp = ExpirationUtils.getTimestampAfterDays(365)
-            val newDateStr = ExpirationUtils.formatDate(newTimestamp)
-            val renewed = doc.copy(
-                expiryDate = newDateStr,
-                expiryTimestamp = newTimestamp,
-                daysRemaining = 365,
-                status = "Verified",
-                isActionNeeded = false
-            )
-            repository.updateDocument(renewed)
-            showToast("✓ Policy renewed! Valid until $newDateStr")
-        }
+    fun setMemberCategoryFilter(category: String) {
+        _memberCategoryFilter.value = category
     }
 
-    fun deleteDocument(docId: String) {
-        viewModelScope.launch {
-            repository.deleteDocument(docId)
-            dismissViewer()
-            showToast("Document removed from vault.")
-        }
+    fun showToast(message: String) {
+        Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
     }
 
     fun saveDocument(
@@ -189,146 +102,126 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         docNumber: String,
         memberId: String,
         expiryDate: String,
-        remindExpiry: Boolean,
-        requireBiometric: Boolean,
-        tags: List<String>,
+        remindExpiry: Boolean = true,
+        requireBiometric: Boolean = false,
+        tags: List<String> = emptyList(),
         fileUri: String? = null,
         fileSizeText: String? = null,
+        metricText: String? = null,
+        sharedNotes: String? = null,
         expiryTimestamp: Long? = null,
         reminderDaysBefore: Int = 30
     ) {
         viewModelScope.launch {
-            val member = allMembers.value.find { it.id == memberId }
+            val member = dao.getMemberById(memberId)
             val memberName = member?.name ?: "Family Member"
+            val calculatedTimestamp = expiryTimestamp ?: ExpirationUtils.parseDate(expiryDate)
+            val daysRemaining = calculatedTimestamp?.let { ExpirationUtils.calculateDaysRemaining(it) }
 
-            // Compute exact days remaining
-            val parsedTimestamp = expiryTimestamp ?: ExpirationUtils.parseDate(expiryDate)
-            val calculatedDays = if (parsedTimestamp != null) {
-                ExpirationUtils.calculateDaysRemaining(parsedTimestamp)
-            } else null
-
-            val isUrgent = calculatedDays != null && calculatedDays <= reminderDaysBefore
             val status = when {
-                calculatedDays != null && calculatedDays < 0 -> "Expired"
-                calculatedDays != null && calculatedDays <= reminderDaysBefore -> "Expiring"
-                else -> "Verified"
+                daysRemaining != null && daysRemaining <= 0 -> "EXPIRED"
+                daysRemaining != null && daysRemaining <= 30 -> "EXPIRING"
+                else -> "ACTIVE"
             }
 
-            val newDoc = VaultDocumentEntity(
-                id = "doc_" + UUID.randomUUID().toString().take(8),
+            val doc = VaultDocumentEntity(
+                id = UUID.randomUUID().toString(),
                 name = name.ifBlank { "Untitled Document" },
                 category = category,
-                provider = provider.ifBlank { "Government Authority" },
-                policyOrIdNumber = docNumber.ifBlank { "REF-" + System.currentTimeMillis().toString().takeLast(6) },
+                provider = provider.ifBlank { "Unspecified Provider" },
+                policyOrIdNumber = docNumber.ifBlank { "N/A" },
                 memberId = memberId,
                 memberName = memberName,
-                expiryDate = expiryDate.ifBlank { "Valid till 2030" },
-                expiryTimestamp = parsedTimestamp,
-                daysRemaining = calculatedDays,
-                status = status,
-                metricText = fileSizeText ?: "End-to-End Encrypted",
-                isActionNeeded = isUrgent && remindExpiry,
-                remindBeforeExpiry = remindExpiry,
-                reminderDaysBefore = reminderDaysBefore,
+                expiryDate = expiryDate,
+                expiryTimestamp = calculatedTimestamp,
+                remindExpiry = remindExpiry,
                 requireBiometric = requireBiometric,
-                tagsCsv = tags.joinToString(","),
-                sharedNotes = if (member?.role?.contains("Organizer") == true) "Shared with Co-Organizer" else null,
-                isPinned = false,
+                tags = tags,
                 fileUri = fileUri,
-                fileType = if (fileUri?.endsWith(".pdf", ignoreCase = true) == true) "application/pdf" else "image/jpeg",
-                fileSizeText = fileSizeText ?: "2.8 MB PDF"
+                fileSizeText = fileSizeText,
+                metricText = metricText,
+                sharedNotes = sharedNotes,
+                status = status,
+                daysRemaining = daysRemaining,
+                lastUpdated = System.currentTimeMillis()
             )
-            repository.insertDocument(newDoc)
-            _uiState.value = _uiState.value.copy(activeScreen = ActiveScreen.MEMBER_VAULT, selectedMemberId = memberId)
 
-            if (isUrgent) {
-                showToast("⚠️ 30-Day Alert Active: ${name} expires in ${calculatedDays} days!")
-            } else {
-                showToast("Saved to ${memberName.split(" ").first()}'s Vault")
+            dao.insertDocument(doc)
+
+            // Update member document count
+            member?.let {
+                dao.updateMember(it.copy(documentCount = it.documentCount + 1))
             }
         }
-    }
-
-    fun addSampleExpiringDocument() {
-        showToast("Vault is operating in clean mode with zero test documents")
     }
 
     fun addFamilyMember(
         name: String,
+        role: String,
         relationship: String,
-        accessPermission: String,
-        avatarUrl: String? = null
+        accessLevel: String = "FULL",
+        avatarUrl: String? = null,
+        isEmergencyContact: Boolean = true
     ) {
         viewModelScope.launch {
-            val id = name.lowercase().replace(" ", "_").take(10) + "_" + UUID.randomUUID().toString().take(4)
-            val initials = name.split(" ")
-                .mapNotNull { it.firstOrNull()?.toString() }
-                .take(2)
-                .joinToString("")
-                .uppercase()
-                .ifBlank { "FM" }
-
-            val isEmergency = accessPermission == "Emergency Contact"
-            val role = if (accessPermission == "Full Access") "Co-Organizer" else "Member"
-
-            val newMember = FamilyMemberEntity(
-                id = id,
-                name = name.trim().ifBlank { "New Member" },
-                relationship = relationship,
-                role = role,
-                accessPermission = accessPermission,
+            val member = FamilyMemberEntity(
+                id = UUID.randomUUID().toString(),
+                name = name.ifBlank { "Family Member" },
+                role = role.ifBlank { "Member" },
+                relationship = relationship.ifBlank { "Relative" },
+                accessLevel = accessLevel,
                 avatarUrl = avatarUrl,
-                initials = initials,
-                badgeColorHex = 0xFF5352ED,
-                isEmergencyContact = isEmergency
+                isEmergencyContact = isEmergencyContact,
+                documentCount = 0
             )
-            repository.insertMember(newMember)
-            showToast("Added $name to Family Vault")
+            dao.insertMember(member)
+            showToast("Added ${member.name} to Family Vault")
         }
     }
 
-    fun showToast(msg: String) {
-        _uiState.value = _uiState.value.copy(toastMessage = msg)
-    }
-
-    fun clearToast() {
-        _uiState.value = _uiState.value.copy(toastMessage = null)
-    }
-
-    fun clearAllDocuments() {
+    fun renewPolicy(doc: VaultDocumentEntity) {
         viewModelScope.launch {
-            repository.clearAllDocuments()
-            showToast("All documents cleared. Vault is now clean.")
+            // Extend policy by 1 year
+            val currentTs = doc.expiryTimestamp ?: System.currentTimeMillis()
+            val newTs = currentTs + (365L * 24 * 60 * 60 * 1000)
+            val newDateStr = ExpirationUtils.formatDate(newTs)
+            val newDays = ExpirationUtils.calculateDaysRemaining(newTs)
+
+            val updatedDoc = doc.copy(
+                expiryDate = newDateStr,
+                expiryTimestamp = newTs,
+                daysRemaining = newDays,
+                status = "ACTIVE",
+                lastUpdated = System.currentTimeMillis()
+            )
+            dao.updateDocument(updatedDoc)
+            showToast("Policy \"${doc.name}\" renewed until $newDateStr")
         }
     }
 
-    fun saveScannedDocument(
-        name: String,
-        memberId: String,
-        category: String = "Identity & IDs",
-        provider: String = "National Issuing Authority",
-        docNumber: String? = null,
-        photoUri: String? = null
-    ) {
-        val calculatedExpiry = ExpirationUtils.getTimestampAfterDays(365)
-        val expiryDateStr = ExpirationUtils.formatDate(calculatedExpiry)
-        val generatedDocNumber = docNumber ?: ("SCAN-" + System.currentTimeMillis().toString().takeLast(6))
+    fun deleteDocument(docId: String) {
+        viewModelScope.launch {
+            val doc = dao.getDocumentById(docId)
+            dao.deleteDocumentById(docId)
+            doc?.memberId?.let { memberId ->
+                val member = dao.getMemberById(memberId)
+                if (member != null && member.documentCount > 0) {
+                    dao.updateMember(member.copy(documentCount = member.documentCount - 1))
+                }
+            }
+            closeDocumentViewer()
+            showToast("Document deleted from secure storage")
+        }
+    }
 
-        saveDocument(
-            name = name,
-            category = category,
-            provider = provider,
-            docNumber = generatedDocNumber,
-            memberId = memberId,
-            expiryDate = expiryDateStr,
-            remindExpiry = true,
-            requireBiometric = false,
-            tags = listOf("#scanned", "#camera", "#encrypted"),
-            fileUri = photoUri,
-            fileSizeText = "1.8 MB (Encrypted Scan)",
-            expiryTimestamp = calculatedExpiry,
-            reminderDaysBefore = 30
-        )
-        showToast("📷 Document captured & encrypted! 30-day early alert active (Expires: $expiryDateStr)")
+    fun purgeTestData() {
+        viewModelScope.launch {
+            dao.clearAllDocuments()
+            val members = dao.getMemberById("organizer")
+            if (members != null) {
+                dao.updateMember(members.copy(documentCount = 0))
+            }
+            showToast("All sample data cleared. Vault is now empty and pristine.")
+        }
     }
 }

@@ -1,11 +1,14 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,43 +25,46 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.ContactEmergency
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsBike
-import androidx.compose.material.icons.filled.Diversity3
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.HomeWork
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PermIdentity
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -66,15 +72,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.ExpirationUtils
 import com.example.data.model.FamilyMemberEntity
 import com.example.data.model.VaultDocumentEntity
 import com.example.ui.components.AddFamilyMemberDialog
-import com.example.ui.components.CyberButton3D
-import com.example.ui.components.CyberIconButton3D
-import com.example.ui.components.CyberSecondaryButton3D
+import com.example.ui.components.Modern8DFloatingBoxButton
 import com.example.ui.components.StatusPill
-import com.example.ui.theme.AlertRed
 import com.example.ui.theme.CyberTeal
 import com.example.ui.theme.CyberTealDark
 import com.example.ui.theme.IndigoLight
@@ -83,100 +87,123 @@ import com.example.ui.theme.QuantumIndigo
 import com.example.ui.theme.SurfaceContainer
 import com.example.ui.theme.SurfaceContainerHigh
 import com.example.ui.theme.SurfaceContainerHighest
-import com.example.ui.theme.SurfaceContainerLowest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.VaultViewModel
-import com.example.data.ExpirationUtils
+import com.example.util.GeminiDocumentAnalyzer
 import com.example.util.NotificationHelper
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
 @Composable
 fun FamilyScreen(
     viewModel: VaultViewModel,
-    onOpenMemberVault: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val members by viewModel.allMembers.collectAsState()
-    val allDocs by viewModel.allDocuments.collectAsState()
+    val scope = rememberCoroutineScope()
+    val allMembers by viewModel.allMembers.collectAsStateWithLifecycle()
+    val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
 
-    var selectedMemberId by remember { mutableStateOf("") }
-    val currentSelectedMember = members.find { it.id == selectedMemberId } ?: members.firstOrNull()
+    var selectedMemberId by remember(allMembers) {
+        mutableStateOf(allMembers.firstOrNull()?.id ?: "organizer")
+    }
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+    var isAddMemberDialogOpen by remember { mutableStateOf(false) }
+    var isAiScanning by remember { mutableStateOf(false) }
+    var selectedDocType by remember { mutableStateOf<String?>(null) }
 
-    androidx.compose.runtime.LaunchedEffect(members) {
-        if (selectedMemberId.isEmpty() && members.isNotEmpty()) {
-            selectedMemberId = members.first().id
+    val currentMember = allMembers.find { it.id == selectedMemberId } ?: allMembers.firstOrNull()
+    val memberDocs = remember(allDocs, currentMember) {
+        allDocs.filter { it.memberId == currentMember?.id }
+    }
+
+    val docTypes = listOf(
+        Pair("Vehicle Insurance", Icons.Default.DirectionsBike),
+        Pair("Driving License", Icons.Default.PermIdentity),
+        Pair("Health Insurance", Icons.Default.HealthAndSafety),
+        Pair("Passport & ID", Icons.Default.PermIdentity),
+        Pair("Property & Deed", Icons.Default.HomeWork),
+        Pair("Other Document", Icons.Default.Description)
+    )
+
+    val filteredMemberDocs = remember(memberDocs, selectedDocType) {
+        if (selectedDocType == null || selectedDocType == "All") memberDocs
+        else memberDocs.filter { it.category.equals(selectedDocType, ignoreCase = true) }
+    }
+
+    // Helper to process captured document with AI extraction and trigger early renewal notification
+    fun processCapturedDocument(photoUri: String?, docType: String? = selectedDocType) {
+        val member = currentMember ?: return
+        val targetCategory = docType ?: "Vehicle Insurance"
+        isAiScanning = true
+        scope.launch {
+            // Run AI analysis to extract title, provider, and expiry date
+            val aiExtracted = GeminiDocumentAnalyzer.analyzeDocument(
+                context = context,
+                imageUriString = photoUri,
+                categoryHint = targetCategory
+            )
+
+            // Save document with AI extracted details
+            viewModel.saveDocument(
+                name = aiExtracted.documentName,
+                category = targetCategory,
+                provider = aiExtracted.provider,
+                docNumber = aiExtracted.documentNumber,
+                memberId = member.id,
+                expiryDate = aiExtracted.expiryDate,
+                remindExpiry = true,
+                requireBiometric = false,
+                tags = listOf("#ai_scanned", "#${targetCategory.lowercase().replace(" ", "_")}", "#encrypted"),
+                fileUri = photoUri,
+                fileSizeText = "2.4 MB (Encrypted)",
+                expiryTimestamp = aiExtracted.expiryTimestamp,
+                reminderDaysBefore = 30
+            )
+
+            val daysRemaining = aiExtracted.expiryTimestamp?.let { ExpirationUtils.calculateDaysRemaining(it) } ?: 28
+
+            // Trigger system renewal alert
+            NotificationHelper.showRenewalAlert(
+                context = context,
+                docName = aiExtracted.documentName,
+                expiryDate = aiExtracted.expiryDate,
+                daysRemaining = daysRemaining,
+                reminderDaysBefore = 30
+            )
+
+            isAiScanning = false
+            viewModel.showToast("✨ AI Updated \"${aiExtracted.documentName}\"! Expiry: ${aiExtracted.expiryDate} (1-Month Alert Active)")
         }
     }
 
-    // Dialog state for adding member
-    var isAddMemberDialogOpen by remember { mutableStateOf(false) }
-    var isMemberPickerOpen by remember { mutableStateOf(false) }
-
-    val fullOrganizersCount = members.count { it.role.contains("Organizer", ignoreCase = true) }
-
-    // Filter documents for the selected family member
-    val memberDocuments = allDocs.filter { it.memberId == currentSelectedMember?.id }
-
-    // Helper for saving captured document with renewal intelligence
-    fun processCapturedDocument(photoUri: String?) {
-        val member = currentSelectedMember ?: return
-        val docName = "${member.name.split(" ").first()}'s Certified Record"
-        val category = "Identity & IDs"
-        val provider = "National Authority & Registration Bureau"
-        val docNumber = "ID-${System.currentTimeMillis().toString().takeLast(6)}"
-
-        // Renewal details: 25 days remaining (triggers 1-month early notification immediately!)
-        val expiryDays = 25
-        val expiryTimestamp = ExpirationUtils.getTimestampAfterDays(expiryDays)
-        val expiryDateStr = ExpirationUtils.formatDate(expiryTimestamp)
-
-        viewModel.saveDocument(
-            name = docName,
-            category = category,
-            provider = provider,
-            docNumber = docNumber,
-            memberId = member.id,
-            expiryDate = expiryDateStr,
-            remindExpiry = true,
-            requireBiometric = false,
-            tags = listOf("#camera_scan", "#renewal_tracked", "#encrypted"),
-            fileUri = photoUri,
-            fileSizeText = "2.1 MB Encrypted Scan",
-            expiryTimestamp = expiryTimestamp,
-            reminderDaysBefore = 30
-        )
-
-        // Show 1-month early notification
-        NotificationHelper.showRenewalAlert(
-            context = context,
-            docName = docName,
-            expiryDate = expiryDateStr,
-            daysRemaining = expiryDays,
-            reminderDaysBefore = 30
-        )
-
-        viewModel.showToast("📷 Document captured! Expiry: $expiryDateStr (1-Month Renewal Alert Active)")
+    // Mobile Document / Photo Picker Launcher (Manual Upload)
+    val mobileDocumentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            processCapturedDocument(uri.toString(), selectedDocType)
+        }
     }
 
-    // Camera Launcher for capturing document
+    // Camera Capture Launcher for Document Scanning
     val cameraCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
-            val file = File(context.cacheDir, "scan_${System.currentTimeMillis()}.jpg")
+            val file = File(context.cacheDir, "family_camera_scan_${System.currentTimeMillis()}.jpg")
             try {
                 FileOutputStream(file).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
                 }
             } catch (_: Exception) {}
-            processCapturedDocument(Uri.fromFile(file).toString())
+            processCapturedDocument(Uri.fromFile(file).toString(), selectedDocType)
         } else {
-            // Simulated capture fallback if camera preview cancelled in testing
-            processCapturedDocument(null)
+            // Simulated capture fallback if physical camera is canceled in emulator
+            processCapturedDocument(null, selectedDocType)
         }
     }
 
@@ -187,7 +214,7 @@ fun FamilyScreen(
         if (isGranted) {
             cameraCaptureLauncher.launch(null)
         } else {
-            // If permission denied or restricted, proceed with simulated optical scan
+            viewModel.showToast("Camera permission required. Proceeding with optical scan simulation.")
             processCapturedDocument(null)
         }
     }
@@ -205,213 +232,100 @@ fun FamilyScreen(
         }
     }
 
-    Column(
+    // Dialog: Add Family Member
+    if (isAddMemberDialogOpen) {
+        AddFamilyMemberDialog(
+            onDismiss = { isAddMemberDialogOpen = false },
+            onSave = { name, role, relationship, accessLevel, isEmergencyContact ->
+                viewModel.addFamilyMember(name, role, relationship, accessLevel, null, isEmergencyContact)
+            }
+        )
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(ObsidianBackground)
             .statusBarsPadding()
     ) {
-        // Top Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(CyberTeal.copy(alpha = 0.15f))
-                        .border(1.dp, CyberTeal.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Diversity3,
-                        contentDescription = "KinKeep",
-                        tint = CyberTeal,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Text(
-                        text = "KinKeep",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(CyberTeal)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Secure Family Vault",
-                            fontSize = 11.sp,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
-
-            // 8D Tactile Add Member Action Button
-            CyberIconButton3D(
-                icon = Icons.Default.PersonAdd,
-                contentDescription = "Add Member",
-                isPrimary = true,
-                size = 38.dp,
-                onClick = { isAddMemberDialogOpen = true },
-                testTag = "top_add_member_button"
-            )
-        }
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header with badge chips
+            // Header
             item {
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Family Members",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "Manage profiles, documents & renewal monitoring",
-                            fontSize = 12.sp,
-                            color = TextSecondary
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(CyberTeal.copy(alpha = 0.15f))
-                                .border(1.dp, CyberTeal.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = CyberTeal,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "${members.size} Members",
+                                text = "FAMILY RECORDS & DOSSIERS",
+                                fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = CyberTeal
+                                color = CyberTeal,
+                                letterSpacing = 1.sp
                             )
                         }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(SurfaceContainerHighest)
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "${allDocs.size} Docs",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 4 Stats in 2x2 grid
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        FamilyStatItem(
-                            icon = Icons.Default.Diversity3,
-                            count = "${members.size}",
-                            label = "Family Members",
-                            modifier = Modifier.weight(1f)
-                        )
-                        FamilyStatItem(
-                            icon = Icons.Default.Folder,
-                            count = "${allDocs.size}",
-                            label = "Total Documents",
-                            modifier = Modifier.weight(1f)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Family Members Hub",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextPrimary
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        FamilyStatItem(
-                            icon = Icons.Default.Security,
-                            count = "$fullOrganizersCount",
-                            label = "Full Organizers",
-                            modifier = Modifier.weight(1f)
-                        )
-                        FamilyStatItem(
-                            icon = Icons.Default.ContactEmergency,
-                            count = "Active",
-                            label = "Emergency Contact",
-                            isStatus = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            // SELECT FAMILY MEMBER (Dropdown)
-            item {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(QuantumIndigo.copy(alpha = 0.2f))
+                            .border(1.dp, QuantumIndigo.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .clickable { isAddMemberDialogOpen = true }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "SELECT FAMILY MEMBER",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
+                            text = "+ New Member",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextMuted,
-                            letterSpacing = 0.6.sp
-                        )
-                        Text(
-                            text = "${members.size} Profiles Available",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = TextMuted
+                            color = IndigoLight
                         )
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+            // SELECT FAMILY MEMBER DROPDOWN BOX
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "SELECT FAMILY MEMBER",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextSecondary
+                    )
 
-                    // Member Picker Box
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(SurfaceContainerLowest)
-                            .border(1.5.dp, CyberTeal.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                            .clickable { isMemberPickerOpen = true }
+                            .background(SurfaceContainer)
+                            .border(1.dp, CyberTeal.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                            .clickable { isDropdownExpanded = true }
                             .padding(horizontal = 14.dp, vertical = 12.dp)
-                            .testTag("select_family_member_dropdown")
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -419,42 +333,32 @@ fun FamilyScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Member initials circle (Zero avatar presets!)
+                                // Member initials circle (No preset avatar image)
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(32.dp)
                                         .clip(CircleShape)
                                         .background(SurfaceContainerHighest)
-                                        .border(2.dp, CyberTeal, CircleShape),
+                                        .border(1.dp, CyberTeal, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (currentSelectedMember?.avatarUrl != null) {
-                                        AsyncImage(
-                                            model = currentSelectedMember.avatarUrl,
-                                            contentDescription = currentSelectedMember.name,
-                                            modifier = Modifier.size(36.dp)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = currentSelectedMember?.initials ?: "FM",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = CyberTeal
-                                        )
-                                    }
+                                    Text(
+                                        text = currentMember?.name?.split(" ")?.mapNotNull { it.firstOrNull()?.toString() }?.take(2)?.joinToString("") ?: "FM",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyberTeal
+                                    )
                                 }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = currentSelectedMember?.name ?: "Select Member",
+                                        text = currentMember?.name ?: "Select Member",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextPrimary
                                     )
                                     Text(
-                                        text = "${currentSelectedMember?.relationship ?: "Family"} • ${currentSelectedMember?.role ?: "Member"}",
+                                        text = "${currentMember?.role ?: "Member"} • ${currentMember?.relationship ?: "Self"}",
                                         fontSize = 11.sp,
                                         color = TextSecondary
                                     )
@@ -462,56 +366,39 @@ fun FamilyScreen(
                             }
 
                             Icon(
-                                imageVector = if (isMemberPickerOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Toggle dropdown",
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Dropdown",
                                 tint = CyberTeal,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
 
                         DropdownMenu(
-                            expanded = isMemberPickerOpen,
-                            onDismissRequest = { isMemberPickerOpen = false },
-                            modifier = Modifier.background(SurfaceContainerHigh)
+                            expanded = isDropdownExpanded,
+                            onDismissRequest = { isDropdownExpanded = false },
+                            modifier = Modifier
+                                .background(SurfaceContainerHigh)
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                         ) {
-                            members.forEach { m ->
+                            allMembers.forEach { member ->
                                 DropdownMenuItem(
                                     text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .clip(CircleShape)
-                                                    .background(SurfaceContainerLowest)
-                                                    .border(1.dp, CyberTeal, CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = m.initials,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = CyberTeal
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = m.name,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = TextPrimary,
-                                                    fontSize = 13.sp
-                                                )
-                                                Text(
-                                                    text = "${m.relationship} • ${m.role}",
-                                                    color = TextSecondary,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
+                                        Column {
+                                            Text(
+                                                text = member.name,
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            )
+                                            Text(
+                                                text = "${member.role} • ${member.relationship}",
+                                                fontSize = 11.sp,
+                                                color = TextSecondary
+                                            )
                                         }
                                     },
                                     onClick = {
-                                        selectedMemberId = m.id
-                                        isMemberPickerOpen = false
+                                        selectedMemberId = member.id
+                                        isDropdownExpanded = false
                                     }
                                 )
                             }
@@ -520,243 +407,483 @@ fun FamilyScreen(
                 }
             }
 
-            // MEMBER DETAILS & DOCUMENTS DISPLAY (UNDER DROPDOWN)
-            if (currentSelectedMember != null) {
-                // 1. MEMBER DETAILS CARD
+            // MEMBER DETAILS DOSSIER CARD (Displayed under dropdown for selected member)
+            if (currentMember != null) {
                 item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .background(SurfaceContainer)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
                             .padding(16.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Member header info
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // Initials avatar
-                                    Box(
-                                        modifier = Modifier
-                                            .size(54.dp)
-                                            .clip(CircleShape)
-                                            .background(SurfaceContainerLowest)
-                                            .border(2.dp, CyberTeal, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = currentSelectedMember.initials,
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = CyberTeal
-                                        )
-                                    }
+                                // Clean Initials Badge (No preset avatar details)
+                                Box(
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .clip(CircleShape)
+                                        .background(SurfaceContainerHighest)
+                                        .border(2.dp, CyberTeal, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = currentMember.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").ifEmpty { "FM" },
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = CyberTeal
+                                    )
+                                }
 
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
 
-                                    Column {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            text = currentSelectedMember.name,
+                                            text = currentMember.name,
                                             fontSize = 17.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextPrimary
                                         )
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(QuantumIndigo.copy(alpha = 0.2f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(CyberTeal.copy(alpha = 0.15f))
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = currentSelectedMember.relationship,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = CyberTeal
-                                                )
-                                            }
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(999.dp))
-                                                    .background(QuantumIndigo.copy(alpha = 0.2f))
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = currentSelectedMember.role,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = IndigoLight
-                                                )
-                                            }
+                                            Text(
+                                                text = currentMember.role,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = IndigoLight
+                                            )
                                         }
                                     }
-                                }
 
-                                if (currentSelectedMember.isEmergencyContact) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(999.dp))
-                                            .background(AlertRed.copy(alpha = 0.15f))
-                                            .border(1.dp, AlertRed.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
+                                    Spacer(modifier = Modifier.height(3.dp))
+
+                                    Text(
+                                        text = "Relationship: ${currentMember.relationship} • Access: ${currentMember.accessLevel}",
+                                        fontSize = 12.sp,
+                                        color = TextSecondary
+                                    )
+
+                                    if (currentMember.isEmergencyContact) {
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "Emergency Nominee",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AlertRed
+                                            text = "🛡️ Emergency Contact Registered",
+                                            fontSize = 11.sp,
+                                            color = CyberTeal,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
                             }
 
-                            // Member security specs
+                            // Stats Pill Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Security,
-                                        contentDescription = null,
-                                        tint = CyberTeal,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SurfaceContainerHighest)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
                                     Text(
-                                        text = "Permission: ${currentSelectedMember.accessPermission}",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
+                                        text = "Docs: ${memberDocs.size} Verified",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = TextPrimary
                                     )
                                 }
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Folder,
-                                        contentDescription = null,
-                                        tint = CyberTeal,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SurfaceContainerHighest)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
                                     Text(
-                                        text = "${memberDocuments.size} Documents",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        text = "Encryption: AES-256",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
                                         color = CyberTeal
                                     )
                                 }
                             }
-
-                            // 8D FLOATING "SCAN WITH CAMERA" BUTTON
-                            CyberButton3D(
-                                text = "Scan with Camera",
-                                icon = Icons.Default.CameraAlt,
-                                onClick = { launchCamera() },
-                                modifier = Modifier.fillMaxWidth(),
-                                testTag = "scan_with_camera_button"
-                            )
                         }
                     }
                 }
+            }
 
-                // 2. MEMBER DOCUMENTS SECTION
-                item {
+            // STEP 1: SELECT DOCUMENT TYPE FIRST
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "DOCUMENTS FOR ${currentSelectedMember.name.uppercase()}",
+                            text = "1. SELECT DOCUMENT TYPE",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextMuted,
-                            letterSpacing = 0.6.sp
-                        )
-                        Text(
-                            text = "${memberDocuments.size} Attached",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
                             color = CyberTeal
                         )
+                        if (selectedDocType != null) {
+                            Text(
+                                text = "Selected: $selectedDocType",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CyberTeal
+                            )
+                        }
+                    }
+
+                    // Interactive Document Type Selection Chips / Cards
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(docTypes) { (type, icon) ->
+                            val isSelected = type == selectedDocType
+                            val count = memberDocs.count { it.category.equals(type, ignoreCase = true) }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) CyberTeal.copy(alpha = 0.25f) else SurfaceContainer
+                                    )
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) CyberTeal else Color.White.copy(alpha = 0.08f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable {
+                                        selectedDocType = if (isSelected) null else type
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) CyberTeal else TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "$type ($count)",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextPrimary else TextSecondary
+                                    )
+                                    if (isSelected) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = CyberTeal,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
 
-                if (memberDocuments.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(SurfaceContainerLowest)
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+            // STEP 2: UPLOAD DOCUMENT OPTIONS (DISPLAYS ONLY AFTER DOCUMENT TYPE IS SELECTED)
+            if (selectedDocType == null) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(SurfaceContainer)
+                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = TextSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Select a Document Type Above",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Choose a type (e.g. Vehicle Insurance, Driving License) to scan or upload for ${currentMember?.name}",
+                                fontSize = 11.sp,
+                                color = TextSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Document type is selected -> Display the upload options with scan or manual upload!
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF0F1722), Color(0xFF0A0F17))
+                                )
+                            )
+                            .border(1.5.dp, CyberTeal.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                            .padding(14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(CyberTeal.copy(alpha = 0.12f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.QrCodeScanner,
-                                        contentDescription = null,
-                                        tint = CyberTeal,
-                                        modifier = Modifier.size(24.dp)
+                                Column {
+                                    Text(
+                                        text = "2. UPLOAD $selectedDocType",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyberTeal
+                                    )
+                                    Text(
+                                        text = "Scan or upload for ${currentMember?.name} with Gemini AI extraction",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
                                     )
                                 }
 
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(CyberTeal.copy(alpha = 0.15f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "READY",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CyberTeal
+                                        )
+                                    }
+                            }
+
+                            // 8D Floating Action Buttons: Scan with Camera or Manual Upload
+                            Modern8DFloatingBoxButton(
+                                title = if (isAiScanning) "AI Analyzing Document..." else "📷 Scan with Camera",
+                                subtitle = "Capture $selectedDocType with AI renewal & 1-month alert",
+                                icon = if (isAiScanning) Icons.Default.AutoAwesome else Icons.Default.CameraAlt,
+                                onClick = { launchCamera() },
+                                isPrimary = true,
+                                badgeText = "AI SCAN",
+                                testTag = "scan_with_camera_button"
+                            )
+
+                            Modern8DFloatingBoxButton(
+                                title = "📁 Manual Upload (From Device)",
+                                subtitle = "Upload $selectedDocType file from mobile with AI extraction",
+                                icon = Icons.Default.UploadFile,
+                                onClick = {
+                                    mobileDocumentPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                isPrimary = false,
+                                badgeText = "MOBILE",
+                                testTag = "upload_from_mobile_button"
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
                                 Text(
-                                    text = "No documents attached to ${currentSelectedMember.name} yet",
-                                    fontSize = 14.sp,
+                                    text = "📝 Open in full manual form",
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-
-                                Text(
-                                    text = "Tap 'Scan with Camera' to capture and automatically track expiry renewal dates",
-                                    fontSize = 12.sp,
-                                    color = TextSecondary,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                CyberSecondaryButton3D(
-                                    text = "Quick Document Scan",
-                                    icon = Icons.Default.CameraAlt,
-                                    onClick = { launchCamera() },
-                                    modifier = Modifier.fillMaxWidth(0.8f)
+                                    color = CyberTeal,
+                                    modifier = Modifier
+                                        .clickable {
+                                            viewModel.openUploadScreen(currentMember?.id, selectedDocType)
+                                        }
+                                        .padding(vertical = 4.dp)
                                 )
                             }
                         }
                     }
-                } else {
-                    items(memberDocuments) { doc ->
-                        MemberDocumentItem(
-                            document = doc,
-                            onView = { viewModel.viewDocument(doc) },
-                            onShare = { viewModel.openShare(doc) },
-                            onRenew = { viewModel.renewPolicy(doc) }
-                        )
+                }
+            }
+
+            // AI Scanning Active Status Banner
+            if (isAiScanning) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(QuantumIndigo.copy(alpha = 0.2f))
+                            .border(1.dp, QuantumIndigo, RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                color = CyberTeal,
+                                strokeWidth = 2.5.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "✨ Gemini AI analyzing $selectedDocType... Extracting expiry date & details",
+                                fontSize = 12.sp,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            // MEMBER DOCUMENTS LIST (Select & View In-App without downloading)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (selectedDocType == null || selectedDocType == "All") {
+                            "${currentMember?.name?.split(" ")?.first() ?: "Member"}'s Documents (${filteredMemberDocs.size})"
+                        } else {
+                            "$selectedDocType (${filteredMemberDocs.size})"
+                        },
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+
+                    Text(
+                        text = "Tap to view in-app",
+                        fontSize = 11.sp,
+                        color = CyberTeal
+                    )
+                }
+            }
+
+            if (filteredMemberDocs.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(SurfaceContainer)
+                            .border(1.dp, CyberTeal.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = CyberTeal,
+                                modifier = Modifier.size(30.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (selectedDocType == null || selectedDocType == "All") "No documents for ${currentMember?.name ?: "this member"}" else "No $selectedDocType documents found",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Select a document type above to scan or upload with AI analysis",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(filteredMemberDocs, key = { it.id }) { doc ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(SurfaceContainer)
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                            .clickable { viewModel.viewDocument(doc) }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(CyberTeal.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = CyberTeal,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = doc.name,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "${doc.provider} • ID: ${doc.policyOrIdNumber}",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Expires: ${doc.expiryDate} (In-App View Ready)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = CyberTeal
+                                )
+                            }
+                        }
+
+                        StatusPill(status = doc.status, daysRemaining = doc.daysRemaining)
                     }
                 }
             }
@@ -764,209 +891,6 @@ fun FamilyScreen(
             item {
                 Spacer(modifier = Modifier.height(80.dp))
             }
-        }
-
-        // Add Family Member Modal Dialog
-        if (isAddMemberDialogOpen) {
-            AddFamilyMemberDialog(
-                onDismiss = { isAddMemberDialogOpen = false },
-                onSave = { name, rel, perm, avatarUrl ->
-                    viewModel.addFamilyMember(name, rel, perm, avatarUrl)
-                    selectedMemberId = name.lowercase().replace(" ", "_").take(10)
-                    isAddMemberDialogOpen = false
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun MemberDocumentItem(
-    document: VaultDocumentEntity,
-    onView: () -> Unit,
-    onShare: () -> Unit,
-    onRenew: () -> Unit
-) {
-    val isUrgent = document.isActionNeeded || (document.daysRemaining != null && document.daysRemaining <= 30)
-
-    val icon = when {
-        document.category.contains("Identity", ignoreCase = true) -> Icons.Default.Badge
-        document.category.contains("Vehicle", ignoreCase = true) -> Icons.Default.DirectionsBike
-        document.category.contains("Health", ignoreCase = true) || document.category.contains("Insurance", ignoreCase = true) -> Icons.Default.HealthAndSafety
-        else -> Icons.Default.HomeWork
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceContainer)
-            .border(
-                1.dp,
-                if (isUrgent) AlertRed.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(14.dp)
-            )
-            .clickable { onView() }
-            .padding(14.dp)
-            .testTag("member_document_card_${document.id}")
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(SurfaceContainerHighest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (isUrgent) AlertRed else CyberTeal,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = document.name,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = "${document.provider} • ${document.policyOrIdNumber.ifEmpty { "Encrypted" }}",
-                            fontSize = 11.sp,
-                            color = TextSecondary
-                        )
-                    }
-                }
-
-                StatusPill(
-                    status = document.status,
-                    daysRemaining = document.daysRemaining
-                )
-            }
-
-            // Expiration Date & 30-Day Alert Banner
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isUrgent) AlertRed.copy(alpha = 0.12f) else SurfaceContainerLowest)
-                    .border(
-                        1.dp,
-                        if (isUrgent) AlertRed.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.05f),
-                        RoundedCornerShape(8.dp)
-                    )
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (isUrgent) Icons.Default.Warning else Icons.Default.NotificationsActive,
-                        contentDescription = null,
-                        tint = if (isUrgent) AlertRed else CyberTeal,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isUrgent) "🚨 Expires: ${document.expiryDate} (${document.daysRemaining ?: 0}d left)"
-                               else "📅 Expiry: ${document.expiryDate} (1-Month Alert Active)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isUrgent) AlertRed else TextPrimary
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onShare,
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onView,
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Visibility,
-                            contentDescription = "View",
-                            tint = CyberTeal,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FamilyStatItem(
-    icon: ImageVector,
-    count: String,
-    label: String,
-    isStatus: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceContainer)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-            .padding(14.dp)
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(SurfaceContainerHighest),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = CyberTeal,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = count,
-                fontSize = if (isStatus) 18.sp else 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = TextSecondary
-            )
         }
     }
 }

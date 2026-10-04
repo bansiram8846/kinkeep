@@ -4,19 +4,22 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.DefaultVaultData
 import com.example.data.model.FamilyMemberEntity
+import com.example.data.model.StringListConverter
 import com.example.data.model.VaultDocumentEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [FamilyMemberEntity::class, VaultDocumentEntity::class],
-    version = 8,
+    entities = [VaultDocumentEntity::class, FamilyMemberEntity::class],
+    version = 1,
     exportSchema = false
 )
+@TypeConverters(StringListConverter::class)
 abstract class VaultDatabase : RoomDatabase() {
     abstract fun vaultDao(): VaultDao
 
@@ -29,7 +32,7 @@ abstract class VaultDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     VaultDatabase::class.java,
-                    "kinkeep_clean_vault_v8.db"
+                    "kinkeep_vault.db"
                 )
                     .fallbackToDestructiveMigration()
                     .addCallback(VaultDatabaseCallback(scope))
@@ -41,19 +44,18 @@ abstract class VaultDatabase : RoomDatabase() {
 
         private class VaultDatabaseCallback(
             private val scope: CoroutineScope
-        ) : Callback() {
+        ) : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     scope.launch(Dispatchers.IO) {
-                        populateDatabase(database.vaultDao())
+                        populateInitialData(database.vaultDao())
                     }
                 }
             }
 
-            suspend fun populateDatabase(vaultDao: VaultDao) {
-                vaultDao.insertMembers(DefaultVaultData.members)
-                vaultDao.insertDocuments(DefaultVaultData.documents)
+            suspend fun populateInitialData(dao: VaultDao) {
+                dao.insertMembers(DefaultVaultData.defaultMembers)
             }
         }
     }

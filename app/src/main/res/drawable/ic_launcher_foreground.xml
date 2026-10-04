@@ -1,8 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/app_launcher_icon_1790848693299"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00C7AB"
+        android:pathData="M54,20 L30,32 L30,56 C30,72 40,86 54,92 C68,86 78,72 78,56 L78,32 Z" />
+    <path
+        android:fillColor="#0A0D14"
+        android:pathData="M54,38 C49,38 45,42 45,47 C45,50 47,53 50,54 L48,64 L60,64 L58,54 C61,53 63,50 63,47 C63,42 59,38 54,38 Z" />
+</vector>

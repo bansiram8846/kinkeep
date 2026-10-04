@@ -1,16 +1,8 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Diversity3
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
@@ -42,7 +35,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -54,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,133 +58,45 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.AlertRedLight
 import com.example.ui.theme.CyberTeal
-import com.example.ui.theme.CyberTealBright
 import com.example.ui.theme.CyberTealDark
+import com.example.ui.theme.IndigoLight
 import com.example.ui.theme.ObsidianBackground
 import com.example.ui.theme.QuantumIndigo
 import com.example.ui.theme.SurfaceContainer
 import com.example.ui.theme.SurfaceContainerHigh
-import com.example.ui.theme.SurfaceContainerHighest
 import com.example.ui.theme.SurfaceContainerLowest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.BottomTab
 
-/**
- * Standard Status Pill indicator
- */
 @Composable
-fun StatusPill(
-    status: String,
-    daysRemaining: Int? = null,
-    modifier: Modifier = Modifier
-) {
-    val isUrgent = daysRemaining != null && daysRemaining <= 30
-    val isExpired = daysRemaining != null && daysRemaining <= 0
-
-    val (bg, border, text, label) = when {
-        isExpired -> Quad(
-            AlertRed.copy(alpha = 0.15f),
-            AlertRed.copy(alpha = 0.5f),
-            AlertRedLight,
-            "EXPIRED"
-        )
-        isUrgent -> Quad(
-            AlertRed.copy(alpha = 0.15f),
-            AlertRed.copy(alpha = 0.5f),
-            AlertRedLight,
-            "EXPIRING (${daysRemaining}d)"
-        )
-        status == "Expiring" -> Quad(
-            Color(0xFFFFA502).copy(alpha = 0.15f),
-            Color(0xFFFFA502).copy(alpha = 0.4f),
-            Color(0xFFFFA502),
-            "EXPIRING"
-        )
-        else -> Quad(
-            CyberTeal.copy(alpha = 0.15f),
-            CyberTeal.copy(alpha = 0.4f),
-            CyberTeal,
-            "VERIFIED"
-        )
+fun StatusPill(status: String, daysRemaining: Int? = null) {
+    val isAlert = status == "EXPIRED" || (daysRemaining != null && daysRemaining <= 30)
+    val bgColor = if (isAlert) AlertRed.copy(alpha = 0.2f) else CyberTeal.copy(alpha = 0.15f)
+    val textColor = if (isAlert) AlertRedLight else CyberTeal
+    val borderColor = if (isAlert) AlertRed.copy(alpha = 0.5f) else CyberTeal.copy(alpha = 0.4f)
+    val text = when {
+        status == "EXPIRED" -> "EXPIRED"
+        daysRemaining != null && daysRemaining <= 0 -> "EXPIRED TODAY"
+        daysRemaining != null && daysRemaining <= 30 -> "$daysRemaining DAYS LEFT"
+        else -> "ACTIVE"
     }
 
     Box(
-        modifier = modifier
+        modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(999.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(text)
-            )
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = text
-            )
-        }
-    }
-}
-
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-
-/**
- * StatCard for overview screens
- */
-@Composable
-fun StatCard(
-    title: String,
-    count: String,
-    subtitle: String,
-    subtitleColor: Color = TextSecondary,
-    isAlert: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceContainer)
-            .border(
-                1.dp,
-                if (isAlert) AlertRed.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(16.dp)
-            )
-            .padding(14.dp)
-    ) {
-        Column {
-            Text(
-                text = title,
-                fontSize = 12.sp,
-                color = TextSecondary,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = count,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isAlert) AlertRedLight else TextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = subtitleColor,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            letterSpacing = 0.5.sp
+        )
     }
 }
 
@@ -452,9 +355,9 @@ fun CyberIconButton3D(
                     }
                 )
                 .border(
-                    1.dp,
-                    if (isPrimary) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
-                    RoundedCornerShape(12.dp)
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp)
                 )
                 .clickable(
                     interactionSource = interactionSource,
@@ -467,41 +370,361 @@ fun CyberIconButton3D(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = if (isPrimary) CyberTealDark else TextPrimary,
-                modifier = Modifier.size((size.value * 0.5f).dp)
+                modifier = Modifier.size(size * 0.48f)
             )
         }
     }
 }
 
 /**
- * Robust Material 3 Bottom Navigation Bar with instant responsiveness,
- * high touch accuracy for emulator and physical devices.
+ * Modern 8D Floating Box Button featuring multi-depth isometric extrusion,
+ * glowing neon rim, elevated icon pedestal, and physical tactile click displacement.
  */
 @Composable
-fun KinKeepBottomNav(
+fun Modern8DFloatingBoxButton(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isPrimary: Boolean = true,
+    badgeText: String? = null,
+    height: Dp = 68.dp,
+    testTag: String = ""
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val pressOffsetY by animateDpAsState(
+        targetValue = if (isPressed) 4.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "8dBoxPress"
+    )
+
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isPressed) 4.dp else 14.dp,
+        label = "8dBoxShadow"
+    )
+
+    Box(
+        modifier = modifier
+            .height(height + 6.dp)
+            .testTag(testTag)
+    ) {
+        // Deep 3D base extrusion (The pedestal)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+                .offset(y = 6.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    if (isPrimary) Color(0xFF00382E) else Color(0xFF080B12)
+                )
+        )
+
+        // Floating interactive face with isometric lighting & glowing border
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+                .offset(y = pressOffsetY)
+                .shadow(
+                    elevation = shadowElevation,
+                    shape = RoundedCornerShape(18.dp),
+                    spotColor = if (isPrimary) CyberTeal.copy(alpha = 0.6f) else QuantumIndigo.copy(alpha = 0.5f),
+                    ambientColor = if (isPrimary) CyberTeal.copy(alpha = 0.3f) else Color.Black
+                )
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    if (isPrimary) {
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF143D36),
+                                Color(0xFF092923),
+                                Color(0xFF061A16)
+                            )
+                        )
+                    } else {
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF1E2433),
+                                Color(0xFF131722),
+                                Color(0xFF0D1017)
+                            )
+                        )
+                    }
+                )
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.linearGradient(
+                        colors = if (isPrimary) {
+                            listOf(
+                                Color(0xFF5FFFEF),
+                                CyberTeal.copy(alpha = 0.8f),
+                                Color(0xFF005E4F)
+                            )
+                        } else {
+                            listOf(
+                                IndigoLight.copy(alpha = 0.7f),
+                                QuantumIndigo.copy(alpha = 0.5f),
+                                Color.White.copy(alpha = 0.1f)
+                            )
+                        }
+                    ),
+                    shape = RoundedCornerShape(18.dp)
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(color = if (isPrimary) CyberTeal else IndigoLight),
+                    onClick = onClick
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Elevated 3D Floating Icon Box
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                spotColor = if (isPrimary) CyberTeal else QuantumIndigo
+                            )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isPrimary) {
+                                    Brush.verticalGradient(
+                                        listOf(Color(0xFF5FFFEF), CyberTeal, Color(0xFF008975))
+                                    )
+                                } else {
+                                    Brush.verticalGradient(
+                                        listOf(Color(0xFF333E56), Color(0xFF202738))
+                                    )
+                                }
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (isPrimary) CyberTealDark else TextPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            if (badgeText != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isPrimary) CyberTeal.copy(alpha = 0.2f) else QuantumIndigo.copy(alpha = 0.25f)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = badgeText,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isPrimary) CyberTeal else IndigoLight
+                                    )
+                                }
+                            }
+                        }
+                        if (subtitle != null) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = subtitle,
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+
+                // 3D chevron arrow indicator
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.06f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = if (isPrimary) CyberTeal else TextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Modern 8D Floating Stat Box with colored isometric elevation,
+ * tactile displacement on click, and responsive status glow.
+ */
+@Composable
+fun Modern8DFloatingStatBox(
+    title: String,
+    count: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isAlert: Boolean = false,
+    subtitleColor: Color = CyberTeal,
+    testTag: String = ""
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val pressOffsetY by animateDpAsState(
+        targetValue = if (isPressed) 3.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "statBoxPress"
+    )
+
+    Box(
+        modifier = modifier
+            .height(106.dp)
+            .testTag(testTag)
+    ) {
+        // Pedestal base
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .offset(y = 5.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (isAlert) Color(0xFF380808) else Color(0xFF090D15)
+                )
+        )
+
+        // Floating top face
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .offset(y = pressOffsetY)
+                .shadow(
+                    elevation = if (isPressed) 3.dp else 10.dp,
+                    shape = RoundedCornerShape(16.dp),
+                    spotColor = if (isAlert) AlertRed.copy(alpha = 0.5f) else CyberTeal.copy(alpha = 0.35f)
+                )
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (isAlert) {
+                            listOf(Color(0xFF2A1012), Color(0xFF1B0A0C))
+                        } else {
+                            listOf(Color(0xFF181C26), Color(0xFF0F121A))
+                        }
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = if (isAlert) {
+                            listOf(AlertRed.copy(alpha = 0.8f), AlertRed.copy(alpha = 0.2f))
+                        } else {
+                            listOf(CyberTeal.copy(alpha = 0.5f), Color.White.copy(alpha = 0.08f))
+                        }
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(color = if (isAlert) AlertRed else CyberTeal),
+                    onClick = onClick
+                )
+                .padding(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = count,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isAlert) AlertRedLight else TextPrimary
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 10.sp,
+                    color = subtitleColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun KinKeepBottomNavigation(
     currentTab: BottomTab,
     onTabSelected: (BottomTab) -> Unit,
-    hasExpiringAlert: Boolean = false,
-    modifier: Modifier = Modifier
+    expiringCount: Int = 0
 ) {
     NavigationBar(
-        modifier = modifier.fillMaxWidth(),
-        containerColor = SurfaceContainerLowest,
+        containerColor = Color(0xFF0E121A),
+        contentColor = TextPrimary,
         tonalElevation = 8.dp
     ) {
         NavigationBarItem(
-            selected = currentTab == BottomTab.VAULT,
-            onClick = { onTabSelected(BottomTab.VAULT) },
+            selected = currentTab == BottomTab.DASHBOARD,
+            onClick = { onTabSelected(BottomTab.DASHBOARD) },
             icon = {
                 Icon(
-                    imageVector = if (currentTab == BottomTab.VAULT) Icons.Filled.Lock else Icons.Outlined.Lock,
+                    imageVector = if (currentTab == BottomTab.DASHBOARD) Icons.Filled.Lock else Icons.Outlined.Lock,
                     contentDescription = "Vault"
                 )
             },
             label = {
                 Text(
                     text = "Vault",
-                    fontWeight = if (currentTab == BottomTab.VAULT) FontWeight.Bold else FontWeight.Normal
+                    fontWeight = if (currentTab == BottomTab.DASHBOARD) FontWeight.Bold else FontWeight.Normal
                 )
             },
             colors = NavigationBarItemDefaults.colors(
@@ -545,8 +768,13 @@ fun KinKeepBottomNav(
             icon = {
                 BadgedBox(
                     badge = {
-                        if (hasExpiringAlert) {
-                            Badge(containerColor = AlertRed)
+                        if (expiringCount > 0) {
+                            Badge(
+                                containerColor = AlertRed,
+                                contentColor = Color.White
+                            ) {
+                                Text(expiringCount.toString())
+                            }
                         }
                     }
                 ) {

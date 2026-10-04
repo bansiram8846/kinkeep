@@ -1,11 +1,10 @@
 package com.example
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,206 +14,107 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.components.BiometricAuthDialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.DocumentViewerDialog
-import com.example.ui.components.ExpirationAlertsDialog
-import com.example.ui.components.KinKeepBottomNav
+import com.example.ui.components.KinKeepBottomNavigation
 import com.example.ui.components.ShareDocumentDialog
-import com.example.ui.screens.ElenaVaultScreen
 import com.example.ui.screens.ExpiringScreen
 import com.example.ui.screens.FamilyScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.UploadDocumentScreen
 import com.example.ui.screens.VaultOverviewScreen
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.KinKeepTheme
 import com.example.ui.theme.ObsidianBackground
-import com.example.ui.viewmodel.ActiveScreen
 import com.example.ui.viewmodel.BottomTab
 import com.example.ui.viewmodel.VaultViewModel
+import com.example.util.NotificationHelper
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: VaultViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        NotificationHelper.createNotificationChannel(this)
+
         setContent {
-            MyApplicationTheme {
-                KinKeepApp()
+            KinKeepTheme {
+                MainVaultApp(viewModel = viewModel)
             }
         }
     }
 }
 
 @Composable
-fun KinKeepApp(
-    viewModel: VaultViewModel = viewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    val expiringDocs by viewModel.expiringDocuments.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+fun MainVaultApp(viewModel: VaultViewModel) {
+    val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val isUploadOpen by viewModel.isUploadScreenOpen.collectAsStateWithLifecycle()
+    val uploadPreselectedMemberId by viewModel.uploadPreselectedMemberId.collectAsStateWithLifecycle()
+    val uploadPreselectedCategory by viewModel.uploadPreselectedCategory.collectAsStateWithLifecycle()
+    val selectedDocForView by viewModel.selectedDocumentForView.collectAsStateWithLifecycle()
+    val selectedDocForShare by viewModel.selectedDocumentForShare.collectAsStateWithLifecycle()
+    val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
 
-    LaunchedEffect(uiState.toastMessage) {
-        uiState.toastMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            viewModel.clearToast()
-        }
+    val expiringCount = allDocs.count { it.status == "EXPIRED" || (it.daysRemaining != null && it.daysRemaining <= 30) }
+
+    // Dialog: In-App Document Viewer (No download required)
+    selectedDocForView?.let { doc ->
+        DocumentViewerDialog(
+            document = doc,
+            onDismiss = { viewModel.closeDocumentViewer() },
+            onDelete = { id -> viewModel.deleteDocument(id) },
+            onShare = { document -> viewModel.openShare(document) }
+        )
     }
 
-    BackHandler(enabled = uiState.activeScreen != ActiveScreen.TABS) {
-        viewModel.navigateBack()
+    // Dialog: Encrypted Share
+    selectedDocForShare?.let { doc ->
+        ShareDocumentDialog(
+            document = doc,
+            onDismiss = { viewModel.closeShare() }
+        )
     }
 
-    BackHandler(enabled = uiState.activeScreen == ActiveScreen.TABS && uiState.currentTab != BottomTab.VAULT) {
-        viewModel.selectTab(BottomTab.VAULT)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ObsidianBackground)
-    ) {
-        when (uiState.activeScreen) {
-            ActiveScreen.MEMBER_VAULT -> {
-                ElenaVaultScreen(
-                    viewModel = viewModel,
-                    onBack = { viewModel.navigateBack() },
-                    onAddDocument = { memberId ->
-                        viewModel.openUpload(memberId)
-                    }
+    if (isUploadOpen) {
+        UploadDocumentScreen(
+            viewModel = viewModel,
+            preselectedMemberId = uploadPreselectedMemberId,
+            preselectedCategory = uploadPreselectedCategory,
+            onClose = { viewModel.closeUploadScreen() }
+        )
+    } else {
+        Scaffold(
+            bottomBar = {
+                KinKeepBottomNavigation(
+                    currentTab = currentTab,
+                    onTabSelected = { viewModel.selectTab(it) },
+                    expiringCount = expiringCount
                 )
-            }
-            ActiveScreen.UPLOAD_DOCUMENT -> {
-                UploadDocumentScreen(
-                    viewModel = viewModel,
-                    onClose = { viewModel.navigateBack() }
-                )
-            }
-            ActiveScreen.TABS -> {
-                Scaffold(
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
-                    bottomBar = {
-                        KinKeepBottomNav(
-                            currentTab = uiState.currentTab,
-                            onTabSelected = { tab ->
-                                viewModel.selectTab(tab)
-                            },
-                            hasExpiringAlert = expiringDocs.isNotEmpty()
-                        )
-                    },
-                    containerColor = ObsidianBackground
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = innerPadding.calculateBottomPadding())
-                    ) {
-                        AnimatedContent(
-                            targetState = uiState.currentTab,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() },
-                            label = "tab_transition"
-                        ) { targetTab ->
-                            when (targetTab) {
-                                BottomTab.VAULT -> {
-                                    VaultOverviewScreen(
-                                        viewModel = viewModel,
-                                        onOpenMemberVault = { memberId ->
-                                            viewModel.openMemberVault(memberId)
-                                        },
-                                        onOpenUpload = {
-                                            viewModel.openUpload()
-                                        },
-                                        onManageFamily = {
-                                            viewModel.selectTab(BottomTab.FAMILY)
-                                        }
-                                    )
-                                }
-                                BottomTab.FAMILY -> {
-                                    FamilyScreen(
-                                        viewModel = viewModel,
-                                        onOpenMemberVault = { memberId ->
-                                            viewModel.openMemberVault(memberId)
-                                        }
-                                    )
-                                }
-                                BottomTab.EXPIRING -> {
-                                    ExpiringScreen(viewModel = viewModel)
-                                }
-                                BottomTab.SETTINGS -> {
-                                    SettingsScreen(viewModel = viewModel)
-                                }
-                            }
-                        }
+            },
+            containerColor = ObsidianBackground
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(ObsidianBackground)
+                    .padding(paddingValues)
+            ) {
+                AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "tab_transition"
+                ) { tab ->
+                    when (tab) {
+                        BottomTab.DASHBOARD -> VaultOverviewScreen(viewModel = viewModel)
+                        BottomTab.FAMILY -> FamilyScreen(viewModel = viewModel)
+                        BottomTab.EXPIRING -> ExpiringScreen(viewModel = viewModel)
+                        BottomTab.SETTINGS -> SettingsScreen(viewModel = viewModel)
                     }
                 }
             }
-        }
-
-        // Biometric Unlock Modal
-        if (uiState.isBiometricModalOpen && uiState.viewerDocument != null) {
-            BiometricAuthDialog(
-                document = uiState.viewerDocument!!,
-                onAuthenticate = {
-                    viewModel.authenticateBiometric()
-                },
-                onDismiss = {
-                    viewModel.dismissViewer()
-                }
-            )
-        }
-
-        // Decrypted Document Viewer Modal
-        if (!uiState.isBiometricModalOpen && uiState.isBiometricAuthenticated && uiState.viewerDocument != null) {
-            DocumentViewerDialog(
-                document = uiState.viewerDocument!!,
-                onDismiss = {
-                    viewModel.dismissViewer()
-                },
-                onDelete = { docId ->
-                    viewModel.deleteDocument(docId)
-                },
-                onShare = { doc ->
-                    viewModel.openShare(doc)
-                }
-            )
-        }
-
-        // Share Dialog
-        if (uiState.shareDialogDoc != null) {
-            ShareDocumentDialog(
-                document = uiState.shareDialogDoc!!,
-                onDismiss = {
-                    viewModel.dismissShare()
-                }
-            )
-        }
-
-        // 30-Day Proactive Expiration Alerts Dialog
-        if (uiState.isAlertsModalOpen) {
-            ExpirationAlertsDialog(
-                expiringDocuments = expiringDocs,
-                onDismiss = {
-                    viewModel.closeAlertsModal()
-                },
-                onRenew = { doc ->
-                    viewModel.renewPolicy(doc)
-                },
-                onViewDocument = { doc ->
-                    viewModel.closeAlertsModal()
-                    viewModel.viewDocument(doc)
-                },
-                onOpenExpiringTab = {
-                    viewModel.closeAlertsModal()
-                    viewModel.selectTab(BottomTab.EXPIRING)
-                }
-            )
         }
     }
 }

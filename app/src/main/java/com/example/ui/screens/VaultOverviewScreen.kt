@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,30 +22,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Diversity3
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.HealthAndSafety
-import androidx.compose.material.icons.filled.HomeWork
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,27 +42,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.FamilyMemberEntity
 import com.example.data.model.VaultDocumentEntity
 import com.example.ui.components.AddFamilyMemberDialog
 import com.example.ui.components.CyberButton3D
-import com.example.ui.components.CyberIconButton3D
-import com.example.ui.components.CyberSecondaryButton3D
 import com.example.ui.components.DocumentSelectorDialog
 import com.example.ui.components.FamilyMemberDetailDialog
+import com.example.ui.components.Modern8DFloatingBoxButton
+import com.example.ui.components.Modern8DFloatingStatBox
 import com.example.ui.components.StatusPill
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.AlertRedLight
 import com.example.ui.theme.CyberTeal
-import com.example.ui.theme.CyberTealBright
 import com.example.ui.theme.CyberTealDark
 import com.example.ui.theme.IndigoLight
 import com.example.ui.theme.ObsidianBackground
@@ -84,7 +67,6 @@ import com.example.ui.theme.QuantumIndigo
 import com.example.ui.theme.SurfaceContainer
 import com.example.ui.theme.SurfaceContainerHigh
 import com.example.ui.theme.SurfaceContainerHighest
-import com.example.ui.theme.SurfaceContainerLowest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -94,22 +76,63 @@ import com.example.ui.viewmodel.VaultViewModel
 @Composable
 fun VaultOverviewScreen(
     viewModel: VaultViewModel,
-    onOpenMemberVault: (String) -> Unit,
-    onOpenUpload: () -> Unit,
-    onManageFamily: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val allDocs by viewModel.allDocuments.collectAsState()
-    val allMembers by viewModel.allMembers.collectAsState()
-    val expiringDocs by viewModel.expiringDocuments.collectAsState()
+    val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
+    val allMembers by viewModel.allMembers.collectAsStateWithLifecycle()
 
-    var isAddMemberDialogOpen by remember { mutableStateOf(false) }
-    var selectedDetailMember by remember { mutableStateOf<FamilyMemberEntity?>(null) }
     var isDocumentSelectorOpen by remember { mutableStateOf(false) }
     var selectedCategoryForSelector by remember { mutableStateOf("All") }
+    var selectedDetailMember by remember { mutableStateOf<FamilyMemberEntity?>(null) }
+    var isAddMemberDialogOpen by remember { mutableStateOf(false) }
 
-    val pinnedDocs = allDocs.filter { it.isPinned }.take(4).ifEmpty { allDocs.take(3) }
-    val urgentDoc = expiringDocs.firstOrNull()
+    val expiringDocs = remember(allDocs) {
+        allDocs.filter { it.status == "EXPIRED" || (it.daysRemaining != null && it.daysRemaining <= 30) }
+    }
+    val urgentDoc = expiringDocs.minByOrNull { it.daysRemaining ?: 999 }
+
+    // Dialog: Family Member Details
+    selectedDetailMember?.let { member ->
+        val memberDocs = allDocs.filter { it.memberId == member.id }
+        FamilyMemberDetailDialog(
+            member = member,
+            documents = memberDocs,
+            onDismiss = { selectedDetailMember = null },
+            onViewDocument = { doc ->
+                viewModel.viewDocument(doc)
+            },
+            onAddDocumentForMember = { memberId ->
+                viewModel.openUploadScreen(memberId)
+            }
+        )
+    }
+
+    // Dialog: Document Selector to choose and view any document
+    if (isDocumentSelectorOpen) {
+        val filteredDocs = if (selectedCategoryForSelector == "All") {
+            allDocs
+        } else {
+            allDocs.filter { it.category.equals(selectedCategoryForSelector, ignoreCase = true) }
+        }
+        DocumentSelectorDialog(
+            documents = filteredDocs,
+            category = selectedCategoryForSelector,
+            onDismiss = { isDocumentSelectorOpen = false },
+            onSelectDocument = { doc ->
+                viewModel.viewDocument(doc)
+            }
+        )
+    }
+
+    // Dialog: Add Family Member
+    if (isAddMemberDialogOpen) {
+        AddFamilyMemberDialog(
+            onDismiss = { isAddMemberDialogOpen = false },
+            onSave = { name, role, relationship, accessLevel, isEmergencyContact ->
+                viewModel.addFamilyMember(name, role, relationship, accessLevel, null, isEmergencyContact)
+            }
+        )
+    }
 
     Box(
         modifier = modifier
@@ -123,104 +146,130 @@ fun VaultOverviewScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Top Bar
+            // Header
             item {
-                Spacer(modifier = Modifier.height(4.dp))
-                DashboardHeader(
-                    expiringCount = expiringDocs.size,
-                    onNotificationsClick = { viewModel.openAlertsModal() },
-                    onProfileClick = {
-                        selectedDetailMember = allMembers.firstOrNull()
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = CyberTeal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "KINKEEP ZERO-KNOWLEDGE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyberTeal,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Family Vault Dashboard",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextPrimary
+                        )
                     }
-                )
-            }
 
-            // Greeting
-            item {
-                Column {
-                    val firstName = allMembers.firstOrNull()?.name?.split(" ")?.firstOrNull()
-                    Text(
-                        text = if (firstName != null && firstName != "Family") "Good morning, $firstName 👋" else "Good morning 👋",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = "Your encrypted family vault is active and secure",
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceContainerHighest)
+                            .border(1.dp, CyberTeal.copy(alpha = 0.4f), CircleShape)
+                            .clickable { selectedDetailMember = allMembers.firstOrNull() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "EM",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberTeal
+                        )
+                    }
                 }
             }
 
-            // 8D FLOATING ACTION BUTTONS
+            // MODERN 8D FLOATING BOX BUTTONS
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    CyberButton3D(
-                        text = "Family Members",
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Modern8DFloatingBoxButton(
+                        title = "Family Members",
+                        subtitle = "Instant Member Dossier & Security Access",
                         icon = Icons.Default.Diversity3,
                         onClick = {
                             selectedDetailMember = allMembers.firstOrNull()
                         },
-                        modifier = Modifier.weight(1f),
+                        isPrimary = true,
+                        badgeText = "${allMembers.size} ACTIVE",
                         testTag = "dashboard_floating_family_members_button"
                     )
 
-                    CyberSecondaryButton3D(
-                        text = "Documents",
+                    Modern8DFloatingBoxButton(
+                        title = "Browse Vault Documents",
+                        subtitle = "Select, Decrypt & View In-App",
                         icon = Icons.Default.FolderOpen,
                         onClick = {
                             selectedCategoryForSelector = "All"
                             isDocumentSelectorOpen = true
                         },
-                        modifier = Modifier.weight(1f),
+                        isPrimary = false,
+                        badgeText = "${allDocs.size} SECURE",
                         testTag = "dashboard_floating_documents_button"
                     )
                 }
             }
 
-            // 3 Stat Cards Row
+            // MODERN 8D FLOATING STAT BOXES
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    StatCard(
+                    Modern8DFloatingStatBox(
                         title = "Total Docs",
                         count = allDocs.size.toString(),
-                        subtitle = if (allDocs.isEmpty()) "Tap to View" else "✓ Select & View",
+                        subtitle = if (allDocs.isEmpty()) "Empty Vault" else "✓ In-App Ready",
                         subtitleColor = CyberTeal,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                selectedCategoryForSelector = "All"
-                                isDocumentSelectorOpen = true
-                            }
+                        onClick = {
+                            selectedCategoryForSelector = "All"
+                            isDocumentSelectorOpen = true
+                        },
+                        modifier = Modifier.weight(1f),
+                        testTag = "stat_total_docs"
                     )
-                    StatCard(
+
+                    Modern8DFloatingStatBox(
                         title = "Family",
                         count = allMembers.size.toString(),
-                        subtitle = "Member Details",
+                        subtitle = "View Details",
                         subtitleColor = CyberTeal,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                selectedDetailMember = allMembers.firstOrNull()
-                            }
+                        onClick = {
+                            selectedDetailMember = allMembers.firstOrNull()
+                        },
+                        modifier = Modifier.weight(1f),
+                        testTag = "stat_family"
                     )
-                    StatCard(
+
+                    Modern8DFloatingStatBox(
                         title = "Expiring",
                         count = expiringDocs.size.toString(),
-                        subtitle = if (expiringDocs.isNotEmpty()) "Action req." else "All Clear",
+                        subtitle = if (expiringDocs.isNotEmpty()) "Action Req." else "All Clear",
                         subtitleColor = if (expiringDocs.isNotEmpty()) AlertRedLight else CyberTeal,
                         isAlert = expiringDocs.isNotEmpty(),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.selectTab(BottomTab.EXPIRING) }
+                        onClick = { viewModel.selectTab(BottomTab.EXPIRING) },
+                        modifier = Modifier.weight(1f),
+                        testTag = "stat_expiring"
                     )
                 }
             }
@@ -228,805 +277,265 @@ fun VaultOverviewScreen(
             // Urgent Banner (Only when urgent document exists)
             if (urgentDoc != null) {
                 item {
-                    UrgentRenewalBanner(
-                        document = urgentDoc,
-                        onRenew = { viewModel.renewPolicy(urgentDoc) }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFF381014), Color(0xFF220A0D))
+                                )
+                            )
+                            .border(1.dp, AlertRed.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = AlertRed,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "POLICY EXPIRING SOON",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AlertRed
+                                    )
+                                }
+                                StatusPill(status = urgentDoc.status, daysRemaining = urgentDoc.daysRemaining)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = urgentDoc.name,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Expires on ${urgentDoc.expiryDate}. Early alert triggered before expiration.",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            CyberButton3D(
+                                text = "Review & Renew Policy",
+                                onClick = { viewModel.renewPolicy(urgentDoc) },
+                                modifier = Modifier.fillMaxWidth(),
+                                height = 40.dp,
+                                testTag = "urgent_renew_button"
+                            )
+                        }
+                    }
                 }
             }
 
             // Family Members Carousel
             item {
-                FamilyMembersSection(
-                    members = allMembers,
-                    totalDocsCount = allDocs.size,
-                    onMemberClick = { memberId ->
-                        selectedDetailMember = allMembers.find { it.id == memberId } ?: allMembers.firstOrNull()
-                    },
-                    onManageClick = {
-                        selectedDetailMember = allMembers.firstOrNull()
-                    },
-                    onAddMemberClick = { isAddMemberDialogOpen = true }
-                )
-            }
-
-            // Document Categories (2x2 Grid)
-            item {
-                DocumentCategoriesSection(
-                    allDocs = allDocs,
-                    onCategoryClick = { catName ->
-                        selectedCategoryForSelector = catName
-                        isDocumentSelectorOpen = true
-                    }
-                )
-            }
-
-            // Pinned & Recent Section
-            if (pinnedDocs.isNotEmpty()) {
-                item {
-                    PinnedAndRecentSection(
-                        documents = pinnedDocs,
-                        onViewDoc = { viewModel.viewDocument(it) },
-                        onShareDoc = { viewModel.openShare(it) },
-                        onViewAll = {
-                            selectedCategoryForSelector = "All"
-                            isDocumentSelectorOpen = true
-                        }
-                    )
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(88.dp))
-            }
-        }
-
-        // Add Family Member Modal Dialog
-        if (isAddMemberDialogOpen) {
-            AddFamilyMemberDialog(
-                onDismiss = { isAddMemberDialogOpen = false },
-                onSave = { name, rel, perm, avatarUrl ->
-                    viewModel.addFamilyMember(name, rel, perm, avatarUrl)
-                }
-            )
-        }
-
-        // Family Member Detail Modal
-        if (selectedDetailMember != null) {
-            FamilyMemberDetailDialog(
-                initialMember = selectedDetailMember!!,
-                allMembers = allMembers,
-                allDocuments = allDocs,
-                onViewDocument = { doc ->
-                    viewModel.viewDocument(doc)
-                },
-                onOpenMemberVault = { memberId ->
-                    onOpenMemberVault(memberId)
-                },
-                onDismiss = {
-                    selectedDetailMember = null
-                }
-            )
-        }
-
-        // Document Selector & Viewer Dialog
-        if (isDocumentSelectorOpen) {
-            DocumentSelectorDialog(
-                allDocuments = allDocs,
-                initialCategory = selectedCategoryForSelector,
-                onSelectDocument = { doc ->
-                    viewModel.viewDocument(doc)
-                },
-                onAddNewDocument = {
-                    onOpenUpload()
-                },
-                onDismiss = {
-                    isDocumentSelectorOpen = false
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun DashboardHeader(
-    expiringCount: Int = 0,
-    onNotificationsClick: () -> Unit,
-    onProfileClick: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(CyberTeal.copy(alpha = 0.15f))
-                        .border(1.dp, CyberTeal.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = "KinKeep Shield",
-                        tint = CyberTeal,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Text(
-                        text = "KinKeep",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "Family Vault",
-                        fontSize = 11.sp,
-                        color = TextMuted
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box {
-                    IconButton(
-                        onClick = onNotificationsClick,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(if (expiringCount > 0) Color(0xFF3B151C) else SurfaceContainerHigh)
-                            .border(
-                                1.dp,
-                                if (expiringCount > 0) AlertRed.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f),
-                                CircleShape
-                            )
-                            .testTag("notification_bell_button")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = if (expiringCount > 0) Icons.Default.NotificationsActive else Icons.Outlined.Notifications,
-                            contentDescription = "Notifications",
-                            tint = if (expiringCount > 0) AlertRedLight else TextSecondary,
-                            modifier = Modifier.size(19.dp)
+                        Text(
+                            text = "Family Members",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "+ Add Member",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberTeal,
+                            modifier = Modifier.clickable { isAddMemberDialogOpen = true }
                         )
                     }
 
-                    if (expiringCount > 0) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(allMembers, key = { it.id }) { member ->
+                            val docCount = allDocs.count { it.memberId == member.id }
+                            Box(
+                                modifier = Modifier
+                                    .width(150.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(SurfaceContainer)
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                                    .clickable { selectedDetailMember = member }
+                                    .padding(12.dp)
+                            ) {
+                                Column {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(SurfaceContainerHighest)
+                                            .border(1.dp, CyberTeal, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = member.name.split(" ").mapNotNull { it.firstOrNull()?.toString() }.take(2).joinToString("").ifEmpty { "M" },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CyberTeal
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = member.name,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = member.role,
+                                        fontSize = 11.sp,
+                                        color = IndigoLight
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "$docCount docs",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Recent Documents Section
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recent Documents",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "View All",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberTeal,
+                            modifier = Modifier.clickable {
+                                selectedCategoryForSelector = "All"
+                                isDocumentSelectorOpen = true
+                            }
+                        )
+                    }
+
+                    if (allDocs.isEmpty()) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 2.dp, y = (-2).dp)
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(AlertRed)
-                                .border(1.5.dp, ObsidianBackground, CircleShape),
+                                .fillMaxWidth()
+                                .height(130.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(SurfaceContainer)
+                                .border(1.dp, CyberTeal.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                                .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (expiringCount > 9) "9+" else "$expiringCount",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    tint = CyberTeal,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Your Clean Family Vault is Empty",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "Use the Family tab to scan your first document with AI",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            allDocs.take(5).forEach { doc ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(SurfaceContainer)
+                                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+                                        .clickable { viewModel.viewDocument(doc) }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(CyberTeal.copy(alpha = 0.12f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Description,
+                                                contentDescription = null,
+                                                tint = CyberTeal,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column {
+                                            Text(
+                                                text = doc.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            )
+                                            Text(
+                                                text = "${doc.memberName} • Expires: ${doc.expiryDate}",
+                                                fontSize = 11.sp,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    }
+
+                                    StatusPill(status = doc.status, daysRemaining = doc.daysRemaining)
+                                }
+                            }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(CyberTeal)
-                        .clickable { onProfileClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "AL",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CyberTealDark
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Security Status sub-bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(CyberTeal)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Private & End-to-End Encrypted",
-                    fontSize = 11.sp,
-                    color = TextSecondary
-                )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.CloudDone,
-                    contentDescription = null,
-                    tint = TextMuted,
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "All synced",
-                    fontSize = 11.sp,
-                    color = TextMuted
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatCard(
-    title: String,
-    count: String,
-    subtitle: String,
-    subtitleColor: Color,
-    isAlert: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceContainer)
-            .border(
-                1.dp,
-                if (isAlert) AlertRed.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(14.dp)
-            )
-            .padding(12.dp)
-    ) {
-        Column {
-            Text(
-                text = title,
-                fontSize = 11.sp,
-                color = TextMuted
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = count,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = subtitleColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun UrgentRenewalBanner(
-    document: VaultDocumentEntity,
-    onRenew: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceContainer)
-            .border(1.dp, AlertRed.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(AlertRed.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = null,
-                        tint = AlertRed,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Text(
-                        text = document.name,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
-                    )
-                    val days = document.daysRemaining
-                    val daysText = if (days != null) "Expires in $days days (${document.expiryDate})" else document.expiryDate
-                    Text(
-                        text = "⚠️ 30-Day Alert • $daysText",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlertRedLight
-                    )
-                }
-            }
-
-            Button(
-                onClick = onRenew,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFF9A8A8),
-                    contentColor = Color(0xFF690005)
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(34.dp)
-            ) {
-                Text(
-                    text = "Renew",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FamilyMembersSection(
-    members: List<FamilyMemberEntity>,
-    totalDocsCount: Int,
-    onMemberClick: (String) -> Unit,
-    onManageClick: () -> Unit,
-    onAddMemberClick: () -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "FAMILY MEMBERS",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 0.8.sp
-            )
-            Text(
-                text = "Manage",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = CyberTeal,
-                modifier = Modifier.clickable { onManageClick() }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
             item {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(CyberTeal)
-                        .clickable { onMemberClick("all") }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "All ($totalDocsCount)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CyberTealDark
-                    )
-                }
-            }
-
-            items(members) { member ->
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(SurfaceContainer)
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                        .clickable { onMemberClick(member.id) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)) CyberTeal.copy(alpha = 0.25f)
-                                else QuantumIndigo.copy(alpha = 0.25f)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (member.avatarUrl != null) {
-                            AsyncImage(
-                                model = member.avatarUrl,
-                                contentDescription = member.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Text(
-                                text = member.initials,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)) CyberTeal else IndigoLight
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    val isSelf = member.relationship.equals("Self", ignoreCase = true) || member.relationship.equals("You", ignoreCase = true)
-                    Text(
-                        text = if (isSelf) "${member.name.split(" ").first()} (You)" else member.name.split(" ").first(),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            // Quick + Add Member pill in carousel
-            item {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(SurfaceContainerHighest)
-                        .border(1.dp, CyberTeal.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
-                        .clickable { onAddMemberClick() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Member",
-                        tint = CyberTeal,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Add Member",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CyberTeal
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DocumentCategoriesSection(
-    allDocs: List<VaultDocumentEntity>,
-    onCategoryClick: (String) -> Unit
-) {
-    val idCount = allDocs.count { it.category.contains("Identity", ignoreCase = true) }
-    val vehCount = allDocs.count { it.category.contains("Vehicles", ignoreCase = true) }
-    val healthCount = allDocs.count { it.category.contains("Health", ignoreCase = true) }
-    val propCount = allDocs.count { it.category.contains("Property", ignoreCase = true) }
-
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "DOCUMENT CATEGORIES",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 0.8.sp
-            )
-            Text(
-                text = "Organized",
-                fontSize = 12.sp,
-                color = TextMuted
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CategoryGridCard(
-                icon = Icons.Default.Badge,
-                iconTint = CyberTeal,
-                title = "Identity & IDs",
-                subtitle = "Passports, Aadhaar, PAN",
-                count = idCount,
-                onClick = { onCategoryClick("Identity") },
-                modifier = Modifier.weight(1f)
-            )
-            CategoryGridCard(
-                icon = Icons.Default.DirectionsBike,
-                iconTint = QuantumIndigo,
-                title = "Vehicles & Auto",
-                subtitle = "RC, Insurance, PUC",
-                count = vehCount,
-                onClick = { onCategoryClick("Vehicles") },
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CategoryGridCard(
-                icon = Icons.Default.HealthAndSafety,
-                iconTint = CyberTeal,
-                title = "Health & Insurance",
-                subtitle = "Mediclaim, Health Cards",
-                count = healthCount,
-                onClick = { onCategoryClick("Insurance") },
-                modifier = Modifier.weight(1f)
-            )
-            CategoryGridCard(
-                icon = Icons.Default.HomeWork,
-                iconTint = QuantumIndigo,
-                title = "Property & Legal",
-                subtitle = "Deeds, Tax Receipts, Wills",
-                count = propCount,
-                onClick = { onCategoryClick("Property") },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun CategoryGridCard(
-    icon: ImageVector,
-    iconTint: Color,
-    title: String,
-    subtitle: String,
-    count: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceContainer)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceContainerHighest)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Text(
-                    text = "$count",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = TextSecondary,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun PinnedAndRecentSection(
-    documents: List<VaultDocumentEntity>,
-    onViewDoc: (VaultDocumentEntity) -> Unit,
-    onShareDoc: (VaultDocumentEntity) -> Unit,
-    onViewAll: () -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "PINNED & RECENT",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 0.8.sp
-            )
-            Text(
-                text = "View All (${documents.size})",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = CyberTeal,
-                modifier = Modifier.clickable { onViewAll() }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            documents.forEach { doc ->
-                PinnedDocItem(
-                    document = doc,
-                    onView = { onViewDoc(doc) },
-                    onShare = { onShareDoc(doc) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PinnedDocItem(
-    document: VaultDocumentEntity,
-    onView: () -> Unit,
-    onShare: () -> Unit
-) {
-    val isUrgent = document.isActionNeeded || (document.daysRemaining != null && document.daysRemaining <= 30)
-
-    val icon = when {
-        document.name.contains("License", ignoreCase = true) -> Icons.Default.Badge
-        document.name.contains("Insurance", ignoreCase = true) || document.name.contains("Bike", ignoreCase = true) -> Icons.Default.DirectionsBike
-        document.name.contains("Health", ignoreCase = true) -> Icons.Default.HealthAndSafety
-        else -> Icons.Default.HomeWork
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceContainer)
-            .border(
-                1.dp,
-                if (isUrgent) AlertRed.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.08f),
-                RoundedCornerShape(12.dp)
-            )
-            .clickable { onView() }
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SurfaceContainerHighest),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isUrgent) AlertRed else CyberTeal,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Text(
-                        text = document.name,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "${document.expiryDate} • ${document.memberName.split(" ").first()}",
-                        fontSize = 11.sp,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusPill(
-                    status = document.status,
-                    daysRemaining = document.daysRemaining
-                )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                IconButton(
-                    onClick = onShare,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onView,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Visibility,
-                        contentDescription = "View",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }

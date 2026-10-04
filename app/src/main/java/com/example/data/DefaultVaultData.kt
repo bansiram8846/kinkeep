@@ -4,21 +4,19 @@ import com.example.data.model.FamilyMemberEntity
 import com.example.data.model.VaultDocumentEntity
 
 object DefaultVaultData {
-    // Clean production profile without any test details, mock identities, or sample documents
-    val members = listOf(
+    val defaultMembers = listOf(
         FamilyMemberEntity(
             id = "organizer",
-            name = "Family Organizer",
+            name = "Elena Morgan",
+            role = "Co-Organizer",
             relationship = "Self",
-            role = "Primary Administrator",
-            accessPermission = "Full Access",
+            accessLevel = "FULL",
             avatarUrl = null,
-            initials = "ME",
-            badgeColorHex = 0xFF00F0D0,
-            isEmergencyContact = false
+            isEmergencyContact = true,
+            documentCount = 0
         )
     )
 
-    // Clean vault: Zero test documents
-    val documents = emptyList<VaultDocumentEntity>()
+    // No sample dummy test data - keeps the vault clean and ready for real scanned documents
+    val defaultDocuments = emptyList<VaultDocumentEntity>()
 }

@@ -1,50 +1,47 @@
 package com.example.ui.theme
 
+import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val KinKeepColorScheme = darkColorScheme(
-    primary = CyberTealBright,
+private val DarkColorScheme = darkColorScheme(
+    primary = CyberTeal,
     onPrimary = CyberTealDark,
-    primaryContainer = CyberTeal,
-    onPrimaryContainer = OnCyberTealContainer,
-    inversePrimary = Color(0xFF006B5C),
-    secondary = IndigoLight,
-    onSecondary = Color(0xFF1500A8),
-    secondaryContainer = IndigoContainer,
-    onSecondaryContainer = OnIndigoContainer,
-    tertiary = Color(0xFFFFEEED),
-    onTertiary = Color(0xFF680013),
-    tertiaryContainer = Color(0xFFFFC8C7),
-    onTertiaryContainer = Color(0xFFB9082C),
-    error = AlertRedLight,
-    onError = Color(0xFF690005),
-    errorContainer = AlertRedContainer,
-    onErrorContainer = OnAlertRedContainer,
+    primaryContainer = CyberTealDark,
+    onPrimaryContainer = CyberTealBright,
+    secondary = QuantumIndigo,
+    onSecondary = ObsidianBackground,
     background = ObsidianBackground,
     onBackground = TextPrimary,
-    surface = ObsidianSurface,
+    surface = SurfaceContainer,
     onSurface = TextPrimary,
-    surfaceVariant = SurfaceContainerHighest,
+    surfaceVariant = SurfaceContainerHigh,
     onSurfaceVariant = TextSecondary,
-    outline = TextMuted,
-    outlineVariant = BorderOutline,
-    surfaceContainerLowest = SurfaceContainerLowest,
-    surfaceContainerLow = SurfaceContainerLow,
-    surfaceContainer = SurfaceContainer,
-    surfaceContainerHigh = SurfaceContainerHigh,
-    surfaceContainerHighest = SurfaceContainerHighest,
-    surfaceBright = SurfaceBright
+    error = AlertRed,
+    onError = TextPrimary
 )
 
 @Composable
-fun MyApplicationTheme(
-    content: @Composable () -> Unit
-) {
+fun KinKeepTheme(content: @Composable () -> Unit) {
+    val colorScheme = DarkColorScheme
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = ObsidianBackground.toArgb()
+            window.navigationBarColor = ObsidianBackground.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+        }
+    }
+
     MaterialTheme(
-        colorScheme = KinKeepColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
