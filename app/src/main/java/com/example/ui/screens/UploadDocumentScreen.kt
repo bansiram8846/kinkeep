@@ -8,6 +8,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.util.FileUtils
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -207,14 +209,32 @@ fun UploadDocumentScreen(
         }
     }
 
-    // Mobile Document / Photo Picker Launcher
-    val documentPickerLauncher = rememberLauncherForActivityResult(
+    // All Folders & Device Storage Document Picker Launcher (Downloads, Documents, Internal Storage, Drive)
+    val allFoldersPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val copiedFile = FileUtils.copyUriToVaultStorage(context, uri)
+            val uriStr = if (copiedFile != null) Uri.fromFile(copiedFile).toString() else uri.toString()
+            val fileName = FileUtils.getFileName(context, uri)
+            attachedFileUri = uriStr
+            attachedFileName = fileName
+            viewModel.showToast("📂 Document Selected: $fileName")
+            runAiDocumentExtraction(uriStr)
+        }
+    }
+
+    // Photo Albums & Gallery Picker Launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val uriStr = uri.toString()
+            val copiedFile = FileUtils.copyUriToVaultStorage(context, uri)
+            val uriStr = if (copiedFile != null) Uri.fromFile(copiedFile).toString() else uri.toString()
+            val fileName = FileUtils.getFileName(context, uri)
             attachedFileUri = uriStr
-            attachedFileName = "mobile_upload_${System.currentTimeMillis().toString().takeLast(4)}.jpg"
+            attachedFileName = fileName
+            viewModel.showToast("🖼️ Photo Selected: $fileName")
             runAiDocumentExtraction(uriStr)
         }
     }
@@ -631,7 +651,7 @@ fun UploadDocumentScreen(
                                     }
                                 }
 
-                                // Two 8D Floating Options: Scan or Upload
+                                // 8D Floating Options: Camera Scan, Device (All Folders), and Photos
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Modern8DFloatingBoxButton(
                                         title = "📷 Scan with Camera",
@@ -644,17 +664,29 @@ fun UploadDocumentScreen(
                                     )
 
                                     Modern8DFloatingBoxButton(
-                                        title = "📁 Upload from Device / Photos",
-                                        subtitle = "Select document image or certificate from mobile storage",
+                                        title = "📁 Upload from Device (All Folders)",
+                                        subtitle = "Browse Downloads, Documents, Internal Storage & Drive",
                                         icon = Icons.Default.UploadFile,
                                         onClick = {
-                                            documentPickerLauncher.launch(
+                                            allFoldersPickerLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        isPrimary = false,
+                                        badgeText = "ALL FOLDERS",
+                                        testTag = "upload_from_device_button"
+                                    )
+
+                                    Modern8DFloatingBoxButton(
+                                        title = "🖼️ Choose from Photos / Gallery",
+                                        subtitle = "Quickly select document photo from mobile albums",
+                                        icon = Icons.Default.Image,
+                                        onClick = {
+                                            photoPickerLauncher.launch(
                                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                             )
                                         },
                                         isPrimary = false,
-                                        badgeText = "MOBILE",
-                                        testTag = "upload_from_device_button"
+                                        badgeText = "PHOTOS",
+                                        testTag = "upload_from_photos_button"
                                     )
                                 }
                             }

@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.util.FileUtils
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -180,12 +181,14 @@ fun FamilyScreen(
         }
     }
 
-    // Mobile Document / Photo Picker Launcher (Manual Upload)
+    // Document Picker across All Folders (Downloads, Documents, Internal Storage, Drive)
     val mobileDocumentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            processCapturedDocument(uri.toString(), selectedDocType)
+            val copied = FileUtils.copyUriToVaultStorage(context, uri)
+            val uriStr = if (copied != null) Uri.fromFile(copied).toString() else uri.toString()
+            processCapturedDocument(uriStr, selectedDocType)
         }
     }
 
@@ -704,16 +707,14 @@ fun FamilyScreen(
                             )
 
                             Modern8DFloatingBoxButton(
-                                title = "📁 Manual Upload (From Device)",
-                                subtitle = "Upload $selectedDocType file from mobile with AI extraction",
+                                title = "📁 Upload from Device (All Folders)",
+                                subtitle = "Browse Downloads, Documents, Internal Storage & Drive for $selectedDocType",
                                 icon = Icons.Default.UploadFile,
                                 onClick = {
-                                    mobileDocumentPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
+                                    mobileDocumentPickerLauncher.launch(arrayOf("*/*"))
                                 },
                                 isPrimary = false,
-                                badgeText = "MOBILE",
+                                badgeText = "ALL FOLDERS",
                                 testTag = "upload_from_mobile_button"
                             )
 
