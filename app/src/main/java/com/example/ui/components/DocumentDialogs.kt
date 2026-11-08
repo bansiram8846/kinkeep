@@ -273,6 +273,8 @@ fun DocumentViewerDialog(
     var offsetY by remember { mutableFloatStateOf(0f) }
     var copyConfirmation by remember { mutableStateOf(false) }
 
+    val fullScreenScrollState = rememberScrollState()
+
     BackHandler {
         if (isImmersiveFullScreen) {
             isImmersiveFullScreen = false
@@ -301,7 +303,7 @@ fun DocumentViewerDialog(
         ) {
             if (isImmersiveFullScreen) {
                 // ==========================================
-                // 1. IMMERSIVE FULL SCREEN IMAGE / CANVAS
+                // 1. IMMERSIVE FULL SCREEN IMAGE / CANVAS (WITH SCROLLING FOR MULTI-PAGE DOCUMENTS)
                 // ==========================================
                 Box(
                     modifier = Modifier
@@ -336,19 +338,27 @@ fun DocumentViewerDialog(
                         }
                 ) {
                     if (!document.fileUri.isNullOrBlank()) {
-                        AsyncImage(
-                            model = document.fileUri,
-                            contentDescription = document.name,
-                            contentScale = ContentScale.Fit,
+                        // Scrollable column so tall or multi-page documents can be scrolled smoothly
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = zoomScale
-                                    scaleY = zoomScale
-                                    translationX = offsetX
-                                    translationY = offsetY
-                                }
-                        )
+                                .verticalScroll(fullScreenScrollState),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            AsyncImage(
+                                model = document.fileUri,
+                                contentDescription = document.name,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        scaleX = zoomScale
+                                        scaleY = zoomScale
+                                        translationX = offsetX
+                                        translationY = offsetY
+                                    }
+                            )
+                        }
                     } else {
                         // Digital certificate full screen canvas
                         Box(
@@ -408,7 +418,7 @@ fun DocumentViewerDialog(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "${(zoomScale * 100).toInt()}% • Double-tap to reset",
+                                text = "${(zoomScale * 100).toInt()}% • Scroll or Zoom",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 color = CyberTeal
@@ -476,7 +486,7 @@ fun DocumentViewerDialog(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "Fit",
+                                text = "Reset",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CyberTeal
@@ -676,17 +686,6 @@ fun DocumentViewerDialog(
                                 }
                             }
                         }
-
-                        // Full Screen Mode Quick Action Button
-                        Modern8DFloatingBoxButton(
-                            title = "⛶ Open Full Screen & Zoom",
-                            subtitle = "Inspect tiny text, stamps, signatures & high-resolution details",
-                            icon = Icons.Default.Fullscreen,
-                            onClick = { isImmersiveFullScreen = true },
-                            isPrimary = true,
-                            badgeText = "FULLSCREEN",
-                            testTag = "open_fullscreen_button"
-                        )
 
                         // Verified Document Metadata & AI Extraction Record
                         Box(

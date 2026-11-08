@@ -148,17 +148,23 @@ fun FamilyScreen(
                 categoryHint = targetCategory
             )
 
-            // Save document with AI extracted details
+            // Save document with AI extracted details (including AI inferred/refined category)
+            val finalCategory = if (aiExtracted.category.isNotBlank() && aiExtracted.category != "Other Document") {
+                aiExtracted.category
+            } else {
+                targetCategory
+            }
+
             viewModel.saveDocument(
                 name = aiExtracted.documentName,
-                category = targetCategory,
+                category = finalCategory,
                 provider = aiExtracted.provider,
                 docNumber = aiExtracted.documentNumber,
                 memberId = member.id,
                 expiryDate = aiExtracted.expiryDate,
                 remindExpiry = true,
                 requireBiometric = false,
-                tags = listOf("#ai_scanned", "#${targetCategory.lowercase().replace(" ", "_")}", "#encrypted"),
+                tags = listOf("#ai_scanned", "#${finalCategory.lowercase().replace(" ", "_")}", "#encrypted"),
                 fileUri = photoUri,
                 fileSizeText = "2.4 MB (Encrypted)",
                 expiryTimestamp = aiExtracted.expiryTimestamp,
@@ -608,43 +614,8 @@ fun FamilyScreen(
                 }
             }
 
-            // STEP 2: UPLOAD DOCUMENT OPTIONS (DISPLAYS ONLY AFTER DOCUMENT TYPE IS SELECTED)
-            if (selectedDocType == null) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(SurfaceContainer)
-                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Description,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Select a Document Type Above",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Choose a type (e.g. Vehicle Insurance, Driving License) to scan or upload for ${currentMember?.name}",
-                                fontSize = 11.sp,
-                                color = TextSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            } else {
-                // Document type is selected -> Display the upload options with scan or manual upload!
+            // STEP 2: UPLOAD DOCUMENT OPTIONS (DISPLAYS ONCE A DOCUMENT TYPE IS SELECTED)
+            if (selectedDocType != null) {
                 item {
                     Box(
                         modifier = Modifier

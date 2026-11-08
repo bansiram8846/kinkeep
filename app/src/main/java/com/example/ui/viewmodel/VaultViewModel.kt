@@ -55,8 +55,19 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val _memberCategoryFilter = MutableStateFlow("All")
     val memberCategoryFilter: StateFlow<String> = _memberCategoryFilter.asStateFlow()
 
+    private val _selectedMemberIdForVault = MutableStateFlow<String?>(null)
+    val selectedMemberIdForVault: StateFlow<String?> = _selectedMemberIdForVault.asStateFlow()
+
     fun selectTab(tab: BottomTab) {
         _currentTab.value = tab
+    }
+
+    fun openMemberVault(memberId: String) {
+        _selectedMemberIdForVault.value = memberId
+    }
+
+    fun closeMemberVault() {
+        _selectedMemberIdForVault.value = null
     }
 
     fun openUploadScreen(memberId: String? = null, category: String? = null) {

@@ -59,6 +59,7 @@ import com.example.ui.theme.SurfaceContainerHighest
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import androidx.activity.compose.BackHandler
 import com.example.ui.viewmodel.VaultViewModel
 
 @Composable
@@ -69,6 +70,7 @@ fun ElenaVaultScreen(
     onAddDocument: (memberId: String, category: String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    BackHandler { onBack() }
     val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
     val allMembers by viewModel.allMembers.collectAsStateWithLifecycle()
     val activeCategory by viewModel.memberCategoryFilter.collectAsStateWithLifecycle()

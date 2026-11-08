@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.DocumentViewerDialog
 import com.example.ui.components.KinKeepBottomNavigation
 import com.example.ui.components.ShareDocumentDialog
+import com.example.ui.screens.ElenaVaultScreen
 import com.example.ui.screens.ExpiringScreen
 import com.example.ui.screens.FamilyScreen
 import com.example.ui.screens.SettingsScreen
@@ -56,6 +57,7 @@ fun MainVaultApp(viewModel: VaultViewModel) {
     val uploadPreselectedCategory by viewModel.uploadPreselectedCategory.collectAsStateWithLifecycle()
     val selectedDocForView by viewModel.selectedDocumentForView.collectAsStateWithLifecycle()
     val selectedDocForShare by viewModel.selectedDocumentForShare.collectAsStateWithLifecycle()
+    val selectedMemberIdForVault by viewModel.selectedMemberIdForVault.collectAsStateWithLifecycle()
     val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
 
     val expiringCount = allDocs.count { it.status == "EXPIRED" || (it.daysRemaining != null && it.daysRemaining <= 30) }
@@ -84,6 +86,15 @@ fun MainVaultApp(viewModel: VaultViewModel) {
             preselectedMemberId = uploadPreselectedMemberId,
             preselectedCategory = uploadPreselectedCategory,
             onClose = { viewModel.closeUploadScreen() }
+        )
+    } else if (selectedMemberIdForVault != null) {
+        ElenaVaultScreen(
+            viewModel = viewModel,
+            memberId = selectedMemberIdForVault ?: "organizer",
+            onBack = { viewModel.closeMemberVault() },
+            onAddDocument = { memberId, category ->
+                viewModel.openUploadScreen(memberId, category)
+            }
         )
     } else {
         Scaffold(
